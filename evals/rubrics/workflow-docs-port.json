@@ -1,0 +1,11 @@
+{
+  "title": "Workflow Documentation Port to Codex Plugin",
+  "gradingCriteria": [
+    "Rejects the copied claim that Workflow is built into Codex or directly invoked by the model; describes the CLI script execution model instead.",
+    "Accurately states where run artifacts live and which files are stable enough to document publicly.",
+    "Explains progress observation through `agent-workflows watch` or MCP resources without promising a native Claude Code-style UI tree.",
+    "Describes resume as content-addressed journal replay with same-script cache hits and independent-call reuse, not strict unchanged-prefix replay.",
+    "Provides replacement public wording in stable target-state form rather than patch-style language about what changed from Claude.",
+    "Keeps the README focused on public CLI behavior, run files, and user-visible guarantees, while leaving implementation internals or comparative fidelity details to separate docs."
+  ]
+}

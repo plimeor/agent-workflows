@@ -1,0 +1,9 @@
+node_modules/
+.agent-workflows/
+*.log
+.DS_Store
+
+# Eval run outputs: large and regenerable (answers, grades, prompts, comparison docs,
+# raw streams). The eval harness itself — cases/, rubrics/, scripts/, workflows/ — stays
+# tracked; re-create results with evals/scripts/run-codex-host.sh + the grader.
+evals/results/

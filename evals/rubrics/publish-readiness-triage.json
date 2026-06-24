@@ -1,0 +1,11 @@
+{
+  "title": "Publish Readiness Triage from Local Outputs",
+  "gradingCriteria": [
+    "States that `workspace:*` and `catalog:` in the local package metadata are not publish blockers by themselves because the project convention says Bun rewrites them during pack/publish.",
+    "Identifies missing publish metadata as blockers: `repository.directory`, `homepage`, and `bugs` are absent.",
+    "Identifies the missing `files` whitelist as a blocker under the repo convention, even though the dry-run tarball happens to include expected files.",
+    "Identifies README incompleteness for a publishable CLI: it lacks install instructions and a first command using the installed `logscan` executable.",
+    "Treats `bun run check` as passing based on the provided output and does not invent type errors.",
+    "Keeps the corrective plan small: add required metadata, add `files`, update README install/first command, rerun check and pack dry-run; no package boundary changes or lockfile churn."
+  ]
+}

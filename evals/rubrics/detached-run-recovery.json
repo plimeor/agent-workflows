@@ -1,0 +1,11 @@
+{
+  "title": "Detached Workflow Run Recovery",
+  "gradingCriteria": [
+    "Identifies that most work is already complete and retained in `journal.json`; the priority is to preserve journal reuse rather than restarting from scratch.",
+    "Distinguishes the failed schema-validation agent from the long-silent running agent and treats them as separate recovery decisions.",
+    "Recommends inspecting status/logs for the silent agent before killing the whole run, then stopping or restarting only the stuck agent if it has no progress.",
+    "Uses resume or admission controls in a sequence that avoids losing completed work: stop failed/stuck agents as needed, fix or narrow the workflow prompt if required, then `agent-workflows resume <runId>` or resume admission to replay cached completed calls.",
+    "Explains that `result.json` missing means the synthesis/final phase has not completed, not that the completed analyses are gone.",
+    "Includes a practical stop condition: if resume repeatedly fails on the same schema field or agent, patch the workflow/schema prompt or synthesize from completed valid outputs rather than repeatedly re-running the whole audit."
+  ]
+}

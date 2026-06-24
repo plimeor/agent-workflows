@@ -1,0 +1,11 @@
+{
+  "title": "Billing Reconciliation Drift After Provider Migration",
+  "gradingCriteria": [
+    "Identifies that Adyen refunds reuse the capture provider_reference/pspReference, so idempotency_key missing event_type or eventId can skip legitimate refunds.",
+    "Explains why missing refunds make internal net revenue higher than provider exports.",
+    "Identifies ledger_day timezone mismatch: internal local merchant day is compared to provider UTC settlement date, causing concentration around 23:00-01:00 UTC.",
+    "Proposes a durable idempotency key that includes provider plus provider event identity, or provider_reference + event_type + eventId where appropriate, without breaking Stripe historical behavior.",
+    "Backfill plan separates raw event replay from ledger writes, is scoped to Adyen EUR refunds after migration, and verifies against provider exports before posting.",
+    "Adds monitoring by provider/event_type/UTC settlement date and duplicate-skip counts."
+  ]
+}

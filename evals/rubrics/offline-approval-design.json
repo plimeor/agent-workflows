@@ -1,0 +1,11 @@
+{
+  "title": "Offline Field Approval System Design",
+  "gradingCriteria": [
+    "Avoids proposing a CRDT platform rewrite for the six-week MVP; chooses versioned drafts, server-side conflict detection, and explicit human resolution for approval conflicts.",
+    "Separates mutable current inspection state from append-only audit events retained for 7 years.",
+    "Handles supervisor approval while inspector is offline by treating approval as a versioned transition and blocking/flagging stale offline edits rather than silently overwriting.",
+    "Includes local durable queue on iPad with attachment upload state, idempotency keys, retry, and visible sync status.",
+    "Addresses PII photos with encryption, scoped access, retention/legal-hold semantics, and product-level redaction/hiding for deletion requests.",
+    "Uses existing Postgres + S3 + queue worker rather than a new synchronization platform, and states concrete MVP limits and open questions."
+  ]
+}

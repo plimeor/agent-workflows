@@ -1,0 +1,18 @@
+{
+	"compilerOptions": {
+		"lib": ["ESNext"],
+		"target": "esnext",
+		"module": "esnext",
+		"moduleResolution": "bundler",
+		"moduleDetection": "force",
+		"verbatimModuleSyntax": false,
+		"noEmit": true,
+		"strict": false,
+		"allowJs": true,
+		"noCheck": true,
+		"skipLibCheck": true,
+		"types": ["bun"]
+	},
+	"include": ["src", "test", "evals/scripts"],
+	"exclude": ["node_modules", ".agent-workflows", "workflows"]
+}

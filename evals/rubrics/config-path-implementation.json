@@ -1,0 +1,11 @@
+{
+  "title": "CLI Config Path Implementation Fix",
+  "gradingCriteria": [
+    "Identifies that `path.join(process.cwd(), absolutePath)` strips or rewrites the absolute-path intent and causes `/tmp/job.json` to resolve under the cwd.",
+    "Handles `~` expansion explicitly for the current user's home directory without adding a dependency and without pretending Node expands it automatically.",
+    "Preserves existing behavior for omitted config and relative paths resolving from `process.cwd()`.",
+    "Uses `path.isAbsolute`, `path.resolve`, and `os.homedir` or equivalent standard-library primitives rather than ad hoc string concatenation for all paths.",
+    "Keeps scope small: edits `resolveConfigPath` and tests only the affected path-resolution behavior rather than rewriting CLI parsing or config loading.",
+    "Verification includes cases for default path, relative path, absolute path, and tilde path, with attention to macOS/Linux behavior and no unsupported claim about Windows unless handled."
+  ]
+}

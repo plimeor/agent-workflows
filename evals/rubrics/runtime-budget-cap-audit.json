@@ -1,0 +1,12 @@
+{
+  "title": "Runtime Budget and Agent-Cap Enforcement Audit",
+  "gradingCriteria": [
+    "Identifies that a journal cache hit (ctx.journal.next(key).hit) returns the cached result before the cap and budget checks, so cached replays are exempt from both MAX_AGENTS and the budget ceiling (no Codex spawn).",
+    "States the agent cap is enforced by `++ctx.counters.launched > MAX_AGENTS` (1000) which counts only live spawns and throws 'agent cap reached' — cached replays do not increment it.",
+    "States the budget ceiling check `ctx.budget.remaining() <= 0` throws 'budget exhausted' and is deliberately NOT journaled, so a resume with more budget re-runs that agent.",
+    "Explains the budget check is performed inside ctx.sem.run AFTER acquiring a concurrency slot so completed agents' token spend is visible; at concurrency 1 this enforces the ceiling exactly, at higher concurrency it bounds overshoot to the in-flight set rather than admitting the whole fan-out.",
+    "Distinguishes the three outcomes correctly: budget/cap conditions throw; abort (ctx.signal.aborted) and stop/admission paths return null; only a normal completed outcome is recorded to the journal (and not when aborted).",
+    "Grounds the answer in budget.ts (remaining() is Infinity when total is null, so an unset budget never refuses) and journal.ts (agentKey folds model/effort/sandbox/schema/etc. into the cache key, and next() replays per-key occurrences in order), referencing concurrency from scheduler.ts.",
+    "Reports running the verification commands (bun test and `bun packages/cli/src/cli.ts lint packages/core/workflows/migrate.mjs`) and/or rg for the literal error strings, rather than reasoning purely from the file names."
+  ]
+}

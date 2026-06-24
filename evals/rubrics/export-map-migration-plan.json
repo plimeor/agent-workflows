@@ -1,0 +1,11 @@
+{
+  "title": "Package Export Map Migration Plan",
+  "gradingCriteria": [
+    "Recognizes that adding a restrictive `exports` map is a public boundary change because it can break deep import consumers even if those imports were undocumented.",
+    "Separates internal workspace cleanup from external compatibility: block or migrate new internal deep imports now while giving known external customers a deprecation path.",
+    "Proposes a staged export map that keeps the root entrypoint and either temporarily exposes documented compatibility subpaths or ships a major-version breaking change with clear migration notes.",
+    "Updates package README as the owner of public API and import-path documentation before or with the package metadata change.",
+    "Removes `src` from published files only when generated `dist` artifacts and declarations cover the supported public subpaths.",
+    "Verification includes pack inspection, type checking downstream consumers, import smoke tests for supported paths, and a search or lint guard for forbidden internal deep imports."
+  ]
+}

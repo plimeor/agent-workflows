@@ -1,0 +1,11 @@
+{
+  "title": "Bounded Scheduler Code Review",
+  "gradingCriteria": [
+    "Finds the continueOnError catch path leak: active is not decremented and next() is not called, so the promise can hang.",
+    "Finds results.filter(Boolean) and if(result) drop valid 0/false/null results.",
+    "Finds result order is not preserved because results.push uses completion order, breaking index-to-input mapping.",
+    "Finds opts.limit || 4 ignores limit=0 and fails to validate non-finite, negative, or fractional limits.",
+    "Mentions abort listener cleanup or in-flight workers continuing after abort as a secondary risk.",
+    "Patch strategy uses preallocated results by input index, decrements active in finally/catch, calls next after handled errors, and resolves without filtering."
+  ]
+}
