@@ -11,8 +11,8 @@ Agent Workflows ports Claude Code's `Workflow` mechanism onto any CLI coding age
 **2. Install the command:**
 
 ```bash
-bun add -g agent-workflows      # global `agent-workflows`
-# or run without installing:  bunx agent-workflows <command>
+bun add -g @plimeor/agent-workflows      # global `agent-workflows`
+# or run without installing:  bunx @plimeor/agent-workflows <command>
 
 agent-workflows doctor          # verify Bun + your host are reachable
 ```
@@ -89,3 +89,12 @@ Every subagent is one text run through `@plimeor/harness`, and the "structured o
 - [`AGENTS.md`](AGENTS.md) — project layout and the contributor guide.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup and the lint/check/test commands.
 - [`docs/decisions/`](docs/decisions/) — the durable design decisions.
+
+## License
+
+Dual-licensed, at your option, under either of:
+
+- [MIT](LICENSE-MIT)
+- [Apache License 2.0](LICENSE-APACHE)
+
+© Plimeor

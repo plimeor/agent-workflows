@@ -1,9 +1,9 @@
 {
 	"name": "@plimeor/agent-workflows",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Deterministic multi-agent workflow orchestration for CLI coding agents.",
 	"homepage": "https://github.com/plimeor/agent-workflows",
-	"license": "MIT",
+	"license": "MIT OR Apache-2.0",
 	"type": "module",
 	"bin": {
 		"agent-workflows": "./src/cli/cli.ts"
@@ -17,7 +17,9 @@
 	},
 	"files": [
 		"src",
-		"workflows"
+		"workflows",
+		"LICENSE-MIT",
+		"LICENSE-APACHE"
 	],
 	"bugs": {
 		"url": "https://github.com/plimeor/agent-workflows/issues"

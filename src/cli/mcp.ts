@@ -23,7 +23,7 @@ import {
 	writeControlCommand,
 } from "./run-control";
 
-const server = new McpServer({ name: "agent-workflows", version: "0.1.0" });
+const server = new McpServer({ name: "agent-workflows", version: "0.1.1" });
 
 // Exposed for characterization tests so they can drive the real start_run handler
 // (including its fail-closed lint gate) without a live MCP transport.
