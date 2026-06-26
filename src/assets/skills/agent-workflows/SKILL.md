@@ -51,11 +51,30 @@ agent-workflows MCP tools:
    for a live progress tree in a terminal.
 3. **Observe, and keep the user informed — you are the progress relay.** A detached run has no GUI
    in this conversation, so the user only sees what you report. Poll `agent_workflows_get_run` with a
-   bounded `waitMs` (e.g. a few seconds); after each poll, surface a **one-line human-readable status**
-   derived from the returned `agents[]` / `phases` — e.g. `Review ✓2/2 · Verify ◐3 ✗1` — never raw
-   JSON. Re-issue the bounded wait until the run is terminal (never poll forever), then report the
-   final result. For a long run, remind the user they can follow it live with
+   bounded `waitMs` (usually 30-60 seconds per poll, shorter for the first heartbeat); after each poll,
+   surface a **one-line human-readable status** derived from the returned `agents[]` / `phases` — e.g.
+   `Review ✓2/2 · Verify ◐3 ✗1` — never raw JSON. Re-issue the bounded wait until the run is terminal,
+   then report the final result. A single agent may legitimately run for 30-60 minutes, and a full
+   workflow may take 1-2 hours. The `waitMs` deadline is only the MCP read deadline, not a workflow
+   timeout. For a long run, remind the user they can follow it live with
    `agent-workflows watch <runId> --follow`.
+
+## Parent-session wait discipline
+
+Once a workflow run starts, treat the workflow as the source of investigation and verification. The
+parent session's active responsibilities are narrow: poll or watch the run, relay concise progress,
+and handle explicit user requests to pause, stop, resume, restart, or inspect workflow state.
+
+Do not read files, search the codebase, run tests, inspect non-workflow logs, or perform independent
+cross-checks while waiting for an active run. That work belongs inside the workflow agents; doing it
+in the parent session fills the main context with duplicate evidence and defeats the point of
+delegation. If you discover after launch that more context is needed, say so and use a visible
+workflow action: wait for completion, ask to stop/pause and revise, resume, or start a follow-up
+workflow.
+
+Do not stop a run or an agent just because it has been running a long time, because a bounded poll
+returned before terminal completion, or because the host appears quiet. Long-running agents are normal.
+Before issuing `stop-run` or `stop-agent`, ask the user for confirmation and wait for an explicit yes.
 
 Or, from a shell, the equivalent CLI:
 
