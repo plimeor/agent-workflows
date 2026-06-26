@@ -11,13 +11,13 @@ Agent Workflows ports Claude Code's `Workflow` mechanism onto any CLI coding age
 **2. Install the command:**
 
 ```bash
-bun add -g agent-workflows      # global `agent-workflows`
-# or run without installing:  bunx agent-workflows <command>
+bun add -g @plimeor/agent-workflows      # global `agent-workflows`
+# or run without installing:  bunx @plimeor/agent-workflows <command>
 
 agent-workflows doctor          # verify Bun + your host are reachable
 ```
 
-**3. Install it into your agent** so it can reach for workflows on its own:
+**3. Install it into your agent** so you can invoke the workflow skill from a normal session:
 
 ```bash
 agent-workflows install         # writes the skills + MCP server + hooks into your host (codex)
@@ -25,13 +25,13 @@ agent-workflows install         # writes the skills + MCP server + hooks into yo
 
 Start a fresh host session afterward so they load. (`agent-workflows uninstall` removes them.)
 
-**4. Use it — the main way is to just ask, in a normal session.** With the skill installed, your agent recognizes when a task is worth decomposing and orchestrates a workflow itself:
+**4. Use it — the main way is to manually invoke the skill in a normal session.** Put the skill trigger directly in your prompt for work that is worth decomposing:
 
-> "Use a workflow to review this branch across correctness, security, and performance — and verify each finding before reporting it."
+> "/agent-workflows Review this branch across correctness, security, and performance — and verify each finding before reporting it."
 
-> "Fan out subagents to map this codebase, then synthesize an architecture overview."
+> "/agent-workflows Fan out subagents to map this codebase, then synthesize an architecture overview."
 
-It will author a small workflow script, launch it, fan out the subagents, and summarize the result. (On a small task it will just answer directly — that's intended.)
+The skill guides the agent to author a small workflow script, launch it, fan out the subagents, and summarize the result. This is an explicit skill invocation path, not a keyword-triggered automatic mode. (On a small task it may still answer directly — that's intended.)
 
 **Or drive one yourself from the CLI:**
 
@@ -89,3 +89,12 @@ Every subagent is one text run through `@plimeor/harness`, and the "structured o
 - [`AGENTS.md`](AGENTS.md) — project layout and the contributor guide.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup and the lint/check/test commands.
 - [`docs/decisions/`](docs/decisions/) — the durable design decisions.
+
+## License
+
+Dual-licensed, at your option, under either of:
+
+- [MIT](LICENSE-MIT)
+- [Apache License 2.0](LICENSE-APACHE)
+
+© Plimeor

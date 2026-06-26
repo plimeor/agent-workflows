@@ -18,7 +18,9 @@ if (found?.runId) {
 	if (found.resultResource)
 		process.stdout.write(`result: ${found.resultResource}\n`);
 	process.stdout.write(
-		"Use agent_workflows_get_run or agent-workflows watch to follow progress.\n",
+		"While it runs, only poll/relay progress or handle explicit run-control requests; " +
+			"do not inspect or verify the codebase in this parent context. " +
+			"Long runs are normal; do not stop without explicit user confirmation.\n",
 	);
 }
 

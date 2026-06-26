@@ -23,7 +23,7 @@ import {
 	writeControlCommand,
 } from "./run-control";
 
-const server = new McpServer({ name: "agent-workflows", version: "0.1.0" });
+const server = new McpServer({ name: "agent-workflows", version: "0.1.1" });
 
 // Exposed for characterization tests so they can drive the real start_run handler
 // (including its fail-closed lint gate) without a live MCP transport.
@@ -137,7 +137,8 @@ server.registerTool(
 server.registerTool(
 	"agent_workflows_get_run",
 	{
-		description: "Read durable status/result data for one Agent Workflows run.",
+		description:
+			"Read durable status/result data for one Agent Workflows run. waitMs is only a read deadline; it never stops or times out the run.",
 		title: "Get Agent Workflows Run",
 		inputSchema: {
 			cwd: z.string().optional(),
@@ -195,7 +196,7 @@ server.registerTool(
 	"agent_workflows_control_run",
 	{
 		description:
-			"Write a control command for a running detached Agent Workflows run.",
+			"Write a control command for a running detached Agent Workflows run. Use stop-run or stop-agent only after explicit user confirmation.",
 		title: "Control Agent Workflows Run",
 		inputSchema: {
 			agentId: z.string().optional(),

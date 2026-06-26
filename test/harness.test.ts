@@ -40,6 +40,38 @@ test("extensionSpec: every bundled skill path exists on disk", () => {
 	}
 });
 
+test("extensionSpec: installed guidance preserves long-run patience boundary", () => {
+	const root = path.resolve(import.meta.dir, "..");
+	const workflowSkill = readFileSync(
+		path.join(root, "src/assets/skills/agent-workflows/SKILL.md"),
+		"utf8",
+	);
+	expect(workflowSkill).toContain(
+		"A single agent may legitimately run for 30-60 minutes",
+	);
+	expect(workflowSkill).toContain(
+		"Before issuing `stop-run` or `stop-agent`, ask the user for confirmation",
+	);
+
+	const runHook = readFileSync(
+		path.join(root, "src/assets/hooks/agent-workflows-run-post-tool-use.ts"),
+		"utf8",
+	);
+	const activeRunsHook = readFileSync(
+		path.join(root, "src/assets/hooks/summarize-active-runs.ts"),
+		"utf8",
+	);
+	expect(runHook).toContain(
+		"Long runs are normal; do not stop without explicit user confirmation",
+	);
+	expect(activeRunsHook).toContain(
+		"Long runs are normal; do not stop without explicit user confirmation",
+	);
+	expect(JSON.stringify(extensionSpec())).toContain(
+		"Long runs are normal; do not stop without explicit user confirmation",
+	);
+});
+
 test("extensionSpec: the codex harness reports the spec as compatible", async () => {
 	const handle = await openCodex();
 	const check = await handle.extensions.check(extensionSpec());

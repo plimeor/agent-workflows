@@ -90,7 +90,10 @@ export function extensionSpec(): HarnessExtension {
 					name: "session-start",
 					event: "SessionStart",
 					command:
-						"echo 'Agent Workflows available: `agent-workflows list` to see named workflows, `agent-workflows run <script|name>` to orchestrate subagents.'",
+						"echo 'Agent Workflows available: `agent-workflows list` to see named workflows, " +
+						"`agent-workflows run <script|name>` to orchestrate subagents. While a run is active, " +
+						"keep this parent session to progress relay unless the user asks for run control. " +
+						"Long runs are normal; do not stop without explicit user confirmation.'",
 				},
 			],
 		},
