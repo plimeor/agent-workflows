@@ -3,6 +3,12 @@
 This changelog is reconstructed from `package.json` version changes and the commits between those
 version boundaries.
 
+## 0.1.3 - 2026-06-28
+
+### Changed
+
+- Updated `@plimeor/harness` from `^0.1.0` to `^0.1.2`.
+
 ## 0.1.2 - 2026-06-26
 
 ### Fixed
