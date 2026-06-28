@@ -1,6 +1,6 @@
 {
 	"name": "@plimeor/agent-workflows",
-	"version": "0.1.5",
+	"version": "0.1.6",
 	"description": "Deterministic multi-agent workflow orchestration for CLI coding agents.",
 	"homepage": "https://github.com/plimeor/agent-workflows",
 	"license": "MIT OR Apache-2.0",

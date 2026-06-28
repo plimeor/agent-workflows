@@ -18,8 +18,9 @@ if (typeof rawCwd === "string" && rawCwd.length > 0) {
 			);
 		}
 		process.stdout.write(
-			"Use agent-workflows watch <runId> --follow or agent_workflows_get_run for details; " +
-				"keep the parent session to progress relay unless the user asks for run control. " +
+			"Long-poll agent_workflows_get_run for status; the user can follow live with " +
+				"agent-workflows watch <runId> --follow in their terminal. " +
+				"Keep the parent session to progress relay unless the user asks for run control. " +
 				"Long runs are normal; do not stop without explicit user confirmation.\n",
 		);
 	}
