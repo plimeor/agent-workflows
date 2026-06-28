@@ -3,6 +3,22 @@
 This changelog is reconstructed from `package.json` version changes and the commits between those
 version boundaries.
 
+## 0.1.6 - 2026-06-29
+
+### Changed
+
+- Reworked the installed skill's progress-relay guidance to cut the per-run polling cost. The parent
+  session now polls `agent_workflows_get_run` as a **long-poll** (a `waitMs` near 180s; the call
+  blocks and returns the instant the run goes terminal — with the final `result` — or when `waitMs`
+  elapses), and **reports only on a real state change** (a phase advanced, an agent errored, or the
+  run finished) instead of emitting a line per poll. This turns a multi-hour run from one chatty turn
+  a minute into a handful of mostly-silent long-polls.
+- Framed `agent-workflows watch <runId> --follow` as the **user's** terminal channel for live
+  progress, not a poll mechanism the parent session runs: `watch` bypasses the compact `get_run`
+  projection (it renders the full per-agent tree), never returns the `result`, and `--follow` blocks
+  until the run ends. The skill and the `summarize-active-runs` session hook now lead with
+  `get_run` and point the user — not the agent — at `watch --follow`.
+
 ## 0.1.5 - 2026-06-28
 
 ### Changed

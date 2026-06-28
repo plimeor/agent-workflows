@@ -86,20 +86,19 @@ agent-workflows MCP tools:
    immediately. (`source` is the literal script; no path, no temp file.) **Then tell the user it
    started** — surface the `runId` and that they can run `agent-workflows watch <runId> --follow`
    for a live progress tree in a terminal.
-3. **Observe, and keep the user informed — you are the progress relay.** A detached run has no GUI
-   in this conversation, so the user only sees what you report. Poll `agent_workflows_get_run` with a
-   bounded `waitMs` of **60 seconds per poll** (a shorter first poll to confirm the run started is
-   fine). It returns a
-   **compact summary by default** — `state`, `currentPhase`, per-phase agent counts, and the last few
-   narration lines — which is all you need to surface a **one-line human-readable status** derived from
-   the per-phase counts, e.g. `Review ✓2/2 · Verify ◐3 ✗1`; never paste raw JSON back. Each poll's
-   payload stays small and bounded regardless of agent count or how long the run has been going, so
-   poll the default summary and reach for `view:'full'` (which adds the full `agents[]`, launch/process
-   metadata, and the `progress.log` tail) only to inspect one stalled or errored agent. Re-issue the
-   bounded wait until the run is terminal, then report the final `result`.
-   A single agent may legitimately run for 30-60 minutes, and a full workflow may take 1-2 hours. The
-   `waitMs` deadline is only the MCP read deadline, not a workflow timeout. For a long run, remind the
-   user they can follow it live with `agent-workflows watch <runId> --follow`.
+3. **Observe sparsely — relay progress, don't narrate every poll.** A detached run has no GUI here, so
+   the user sees only what you report. Poll `agent_workflows_get_run` as a **long-poll**: pass a
+   `waitMs` near **180s**; the call blocks and returns the instant the run goes terminal (with the
+   final `result`) or when `waitMs` elapses. The default is a **compact summary** (`state`,
+   `currentPhase`, per-phase counts, recent narration); use `view:'full'` only to inspect one stalled
+   or errored agent. **Report only on a real state change** — a phase advanced, an agent errored, or
+   the run finished — as a one-line status from the per-phase counts, e.g. `Review ✓2/2 · Verify ◐3 ✗1`;
+   never paste raw JSON. Otherwise stay silent and re-issue the long-poll; report the final `result`
+   once terminal.
+   A single agent may legitimately run for 30-60 minutes, and a full workflow may take 1-2 hours; the
+   `waitMs` is only a read deadline, not a workflow timeout. Live progress is the **user's** job, via
+   `agent-workflows watch <runId> --follow` in their terminal — don't call `watch` yourself (it never
+   returns the `result`, and `--follow` blocks until the run ends).
 
 Or, from a shell, the equivalent CLI:
 
@@ -120,8 +119,9 @@ calls replay instantly.
 ## Wait discipline — for a running run only
 
 Once a run is active, treat **that run** as the source of its own investigation. The parent
-session's active responsibilities are narrow: poll or watch the run, relay concise progress, and
-handle explicit user requests to pause, stop, resume, restart, or inspect workflow state.
+session's active responsibilities are narrow: long-poll the run, relay concise progress on real
+state changes, and handle explicit user requests to pause, stop, resume, restart, or inspect
+workflow state.
 
 Do not bypass a running run with duplicate searching, reading, or cross-checking in the parent — that
 work is already happening inside the agents, and duplicating it fills the main context with evidence
