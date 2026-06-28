@@ -199,12 +199,57 @@ test("schema agent with non-JSON output → null after retries", async () => {
 	expect(out.result).toBeNull();
 });
 
-test("schema agent recovers on retry after a first schema-invalid reply", async () => {
+test("schema agent recovers on retry by repairing the prior reply (no full re-run)", async () => {
 	const out = await run(`
     export const meta = { name: 'schretry', description: 'd' }
     const S = { type:'object', additionalProperties:false, required:['n'], properties:{ n:{type:'number'} } }
-    return await agent('SCHEMAFAILONCE SET n=5', { schema: S })`);
+    return await agent('TYPEFAIL SET n=5', { schema: S })`);
+	// First reply emits {"n":"5"} (number stringified → type error); the repair pass coerces it
+	// back rather than re-running the task, preserving the emitted value.
 	expect(out.result).toEqual({ n: 5 });
+});
+
+test("schema retry sends a repair prompt (prior reply + errors), NOT the original task", async () => {
+	const S = {
+		type: "object",
+		required: ["n"],
+		properties: { n: { type: "number" } },
+	};
+	const prompts: string[] = [];
+	const replies = [
+		{ exitCode: 0, finalText: '{"n":"5"}' }, // attempt 0: parses, fails on type
+		{ exitCode: 0, finalText: '{"n":5}' }, // attempt 1: the repaired reply
+	];
+	let i = 0;
+	// biome-ignore lint/suspicious/noExplicitAny: structural stand-in for a HarnessHandle.
+	const harness: any = {
+		process: {
+			// biome-ignore lint/suspicious/noExplicitAny: request is the engine's RunRequest.
+			async run(request: any) {
+				prompts.push(String(request.prompt));
+				const r = replies[Math.min(i++, replies.length - 1)];
+				return {
+					result: Promise.resolve({ ...r, signal: undefined }),
+					kill() {},
+				};
+			},
+		},
+	};
+	const out = await run(
+		`export const meta = { name: 'rep', description: 'd' }
+     const S = ${JSON.stringify(S)}
+     return await agent('UNIQUE_TASK_MARKER read the files and analyze', { schema: S })`,
+		{ harness },
+	);
+	expect(out.result).toEqual({ n: 5 });
+	expect(prompts).toHaveLength(2);
+	// Attempt 0 carries the full task; the retry must NOT re-send it (that is the token win).
+	expect(prompts[0]).toContain("UNIQUE_TASK_MARKER");
+	expect(prompts[1]).not.toContain("UNIQUE_TASK_MARKER");
+	// The retry is the repair prompt: it reshapes the prior reply and names the exact error.
+	expect(prompts[1]).toContain("Reshape ONLY");
+	expect(prompts[1]).toContain('{"n":"5"}');
+	expect(prompts[1]).toContain("expected number");
 });
 
 // ── budget (inert under the harness; decision 003) ────────────────────────────

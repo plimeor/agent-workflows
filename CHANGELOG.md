@@ -3,6 +3,36 @@
 This changelog is reconstructed from `package.json` version changes and the commits between those
 version boundaries.
 
+## 0.1.5 - 2026-06-28
+
+### Changed
+
+- Made `agent_workflows_get_run` return a **compact progress summary by default** instead of the full
+  durable read: `state`, `currentPhase`, per-phase agent counts (non-zero states only), the last few
+  narration lines, and the terminal `result`. The summary never reads or returns the `progress.log`
+  tail and omits `launch` / `process` / `heartbeat` / `control` / the full `agents[]`, so each poll
+  stays bounded regardless of agent count or run length. Pass `view: 'full'` to get the previous full
+  payload (including the `progress.log` tail via `logTailBytes`) for drilling into one agent. The
+  projection lives in the MCP layer only — `getRun` core and `status.json` are unchanged, so the CLI
+  `watch` / `ps` live progress tree is unaffected. See `docs/decisions/005`.
+- Updated the installed Agent Workflows skill so the parent session derives its one-line status from
+  the compact per-phase counts, reaches for `view: 'full'` only to inspect a stalled or errored agent,
+  and polls with a 60-second-minimum `waitMs` (raised from 30s) to further cut accumulated poll cost.
+- Changed the schema-bound `agent()` retry from a full re-run to a **repair pass**: when a reply
+  parses or validates wrong, the retry now hands the agent only its prior reply, the schema, and the
+  exact validation errors and asks it to reshape — skipping the original task's file reads and
+  re-reasoning, which were the dominant retry cost. A transient host death still re-runs the full
+  task (there is nothing to repair). The repair prompt forbids inventing or dropping content (an
+  unsupported required field becomes null rather than a fabricated value), so a reply that genuinely
+  dropped a required field stays invalid rather than being recovered by re-running. The DSL contract
+  is unchanged: `agent(prompt, { schema })` still returns the validated object or `null`. See
+  `docs/decisions/006`.
+- Tightened the authoring guidance: documented that `phase()` is a single global cursor so staged
+  `agent()` calls must pass `opts.phase` explicitly under `parallel()`/`pipeline()`, that `workflow()`
+  throws on an unknown name / unreadable `scriptPath` / child syntax error (wrap in `try/catch` to
+  degrade gracefully), and that a judge panel synthesizes from the winner while grafting the best
+  ideas from the runners-up.
+
 ## 0.1.4 - 2026-06-28
 
 ### Changed

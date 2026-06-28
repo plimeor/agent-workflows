@@ -42,6 +42,41 @@ export function buildAgentPrompt(
 	return parts.join("\n\n---\n\n");
 }
 
+// Assemble a CHEAP repair prompt for a schema retry. When a schema-bound agent's prior reply
+// parsed or validated wrong, the substantive work (file reads + reasoning) is already done and
+// captured in `priorText` — only the JSON envelope/shape is off. Re-running the full original
+// task (which re-reads files and re-reasons) just to fix that is the dominant retry waste, so
+// instead we hand the agent ONLY its own prior reply, the schema, and the exact validation
+// errors, and ask it to reshape rather than redo. The "do not invent / do not drop / null an
+// unsupported required field" guard keeps a strict `required` from being fabricated to satisfy
+// the schema — important for fund-sensitive review output. The original task prompt and the
+// profile preamble are deliberately omitted: this is a mechanical reshape, not the task.
+export function buildRepairPrompt(
+	priorText: string,
+	schema: unknown,
+	errors: string[],
+): string {
+	return [
+		SUBAGENT_PREAMBLE,
+		[
+			"Your previous reply could not be used: it did not conform to the required JSON Schema.",
+			"Reshape ONLY the content you already produced into a single valid JSON value. Do NOT redo the analysis and do NOT read anything new.",
+			"Do not invent content and do not drop content present below. If a required field has no basis in your previous reply, use null (or an empty array/string) rather than fabricating a value.",
+			"",
+			"Required JSON Schema:",
+			JSON.stringify(schema),
+			"",
+			"Problems to fix:",
+			errors.map((e) => `- ${e}`).join("\n"),
+			"",
+			"Your previous reply:",
+			priorText,
+			"",
+			"Return ONLY the corrected JSON value — no prose, no code fences.",
+		].join("\n"),
+	].join("\n\n---\n\n");
+}
+
 // Parse a JSON value out of a text-mode agent reply. Tries the whole string first, then
 // extracts the first balanced {…}/[…] so incidental prose around the JSON does not force a
 // spurious retry. Throws when no balanced JSON value is present.

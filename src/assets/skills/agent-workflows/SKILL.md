@@ -88,13 +88,18 @@ agent-workflows MCP tools:
    for a live progress tree in a terminal.
 3. **Observe, and keep the user informed — you are the progress relay.** A detached run has no GUI
    in this conversation, so the user only sees what you report. Poll `agent_workflows_get_run` with a
-   bounded `waitMs` (usually 30-60 seconds per poll, shorter for the first heartbeat); after each poll,
-   surface a **one-line human-readable status** derived from the returned `agents[]` / `phases` — e.g.
-   `Review ✓2/2 · Verify ◐3 ✗1` — never raw JSON. Re-issue the bounded wait until the run is terminal,
-   then report the final result. A single agent may legitimately run for 30-60 minutes, and a full
-   workflow may take 1-2 hours. The `waitMs` deadline is only the MCP read deadline, not a workflow
-   timeout. For a long run, remind the user they can follow it live with
-   `agent-workflows watch <runId> --follow`.
+   bounded `waitMs` of **60 seconds per poll** (a shorter first poll to confirm the run started is
+   fine). It returns a
+   **compact summary by default** — `state`, `currentPhase`, per-phase agent counts, and the last few
+   narration lines — which is all you need to surface a **one-line human-readable status** derived from
+   the per-phase counts, e.g. `Review ✓2/2 · Verify ◐3 ✗1`; never paste raw JSON back. Each poll's
+   payload stays small and bounded regardless of agent count or how long the run has been going, so
+   poll the default summary and reach for `view:'full'` (which adds the full `agents[]`, launch/process
+   metadata, and the `progress.log` tail) only to inspect one stalled or errored agent. Re-issue the
+   bounded wait until the run is terminal, then report the final `result`.
+   A single agent may legitimately run for 30-60 minutes, and a full workflow may take 1-2 hours. The
+   `waitMs` deadline is only the MCP read deadline, not a workflow timeout. For a long run, remind the
+   user they can follow it live with `agent-workflows watch <runId> --follow`.
 
 Or, from a shell, the equivalent CLI:
 
@@ -228,7 +233,7 @@ The patterns these skeletons compose from:
 - **Multi-modal sweep** — parallel agents each searching a different way (by-container, by-content,
   by-entity, by-time).
 - **Judge panel** — N independent attempts from different angles, scored by parallel judges,
-  synthesized from the winner.
+  synthesized from the winner while grafting the best ideas from the runners-up.
 
 These are **parts, not a ceiling.** Compose novel harnesses when the task calls for it — tournament
 brackets, self-repair loops, staged escalation, whatever fits.

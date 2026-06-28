@@ -138,13 +138,14 @@ server.registerTool(
 	"agent_workflows_get_run",
 	{
 		description:
-			"Read durable status/result data for one Agent Workflows run. waitMs is only a read deadline; it never stops or times out the run.",
+			"Read durable status/result data for one Agent Workflows run. Returns a compact progress summary by default (state, currentPhase, per-phase agent counts, recent narration, and result once terminal) — enough to relay a one-line status without re-reading the full agent tree each poll. Pass view:'full' to drill into the complete agents[]/launch/process/heartbeat/control payload. waitMs is only a read deadline; it never stops or times out the run.",
 		title: "Get Agent Workflows Run",
 		inputSchema: {
 			cwd: z.string().optional(),
 			includeResult: z.boolean().optional(),
 			logTailBytes: z.number().int().positive().max(1_000_000).optional(),
 			runId: z.string(),
+			view: z.enum(["summary", "full"]).optional(),
 			waitMs: z.number().int().positive().max(300_000).optional(),
 		},
 	},
@@ -154,6 +155,7 @@ server.registerTool(
 			await __testGetRunWithWait(cwd, input.runId, {
 				includeResult: input.includeResult !== false,
 				logTailBytes: input.logTailBytes || 0,
+				view: input.view ?? "summary",
 				waitMs: input.waitMs,
 			}),
 		);
@@ -296,24 +298,73 @@ export async function __testGetRunWithWait(
 	options: {
 		includeResult?: boolean;
 		logTailBytes?: number;
+		view?: "summary" | "full";
 		waitMs?: number;
 	} = {},
 ) {
+	const view = options.view ?? "summary";
 	const readOptions = {
 		includeResult: options.includeResult !== false,
-		logTailBytes: options.logTailBytes || 0,
+		// The summary projection never surfaces the raw progress.log tail, so don't
+		// even read it; only the full view honors logTailBytes.
+		logTailBytes: view === "full" ? options.logTailBytes || 0 : 0,
 	};
 	const deadline = options.waitMs != null ? Date.now() + options.waitMs : null;
 	while (true) {
 		const run = await getRun(cwd, runId, readOptions);
 		const terminal =
 			run.result != null || TERMINAL_STATES.has(String(run.state));
-		if (deadline == null || terminal || Date.now() >= deadline) return run;
+		if (deadline == null || terminal || Date.now() >= deadline)
+			return projectRun(run, view);
 		const remaining = deadline - Date.now();
 		await new Promise((resolve) =>
 			setTimeout(resolve, Math.min(50, Math.max(1, remaining))),
 		);
 	}
+}
+
+// Compact MCP read projection. `get_run` is polled repeatedly across a long run, and
+// the full read — status.agents[] plus launch/process/heartbeat/control plus a
+// monotonically growing progress.log tail — accumulates in the caller's context on
+// every poll. The summary view returns only what a progress relay needs: per-phase
+// agent counts (non-zero states only), the recent narration, and the terminal result.
+// Each poll then stays bounded regardless of agent count or run length. `view: 'full'`
+// returns the unprojected read for drilling into one run. The projection lives in the
+// MCP layer only; getRun core and status.json are unchanged, so CLI watch/ps still see
+// the full agent tree.
+function projectRun(run: any, view: "summary" | "full") {
+	if (view === "full") return run;
+	const status = run.status || {};
+	const agents = Array.isArray(status.agents) ? status.agents : [];
+	const declared = Array.isArray(status.phases) ? status.phases : [];
+	const counts = new Map<string, Record<string, number>>();
+	for (const a of agents) {
+		const title = a.phase ?? "-";
+		const bucket = counts.get(title) || {};
+		bucket[a.state] = (bucket[a.state] || 0) + 1;
+		counts.set(title, bucket);
+	}
+	const titles = [...declared];
+	for (const title of counts.keys())
+		if (!titles.includes(title)) titles.push(title);
+	const phases = titles.map((title) => ({
+		title,
+		...(counts.get(title) || {}),
+	}));
+	const narration = Array.isArray(status.narration)
+		? status.narration.slice(-5).map((n: any) => n?.message ?? String(n))
+		: [];
+	return {
+		runId: run.runId,
+		name: status.name ?? run.launch?.name ?? null,
+		state: run.state,
+		currentPhase: status.currentPhase ?? null,
+		updatedAt: status.updatedAt ?? null,
+		phases,
+		narration,
+		result: run.result ?? null,
+		view: "summary",
+	};
 }
 
 function runResourceUri(runId: string, kind: string) {

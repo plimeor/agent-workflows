@@ -1,7 +1,12 @@
 // The workflow DSL: agent / parallel / pipeline / phase / log / workflow, plus args and
 // budget. These are injected as globals into the workflow script. Semantics are a 1:1
 // reproduction of Claude Code's Workflow tool — see docs/decisions/001-workflow-dsl-fidelity-contract.md.
-import { buildAgentPrompt, extractJson, runHarnessAgent } from "./agent-run";
+import {
+	buildAgentPrompt,
+	buildRepairPrompt,
+	extractJson,
+	runHarnessAgent,
+} from "./agent-run";
 import { agentKey } from "./journal";
 import { resolveProfile } from "./profiles";
 import { validate } from "./schema";
@@ -103,21 +108,29 @@ export function buildDsl(ctx) {
 
 					// Up to 2 attempts for BOTH paths: a transient host-agent death is retried
 					// whether or not a schema is set; schema agents additionally retry on
-					// parse/validate misses, with the schema embedded in the prompt.
+					// parse/validate misses. A schema retry does NOT re-run the full task — the
+					// analysis is already in the prior reply, so we repair just the JSON envelope
+					// (buildRepairPrompt), skipping the expensive file reads + re-reasoning. A
+					// transient death (!res.ok) leaves nothing to repair, so it re-runs the
+					// original prompt from scratch.
 					const attempts = 2;
 					let result = null;
-					let correction = ""; // on a schema retry, tell the fresh agent why the last try failed
+					let repairFrom: string | null = null; // prior reply to reshape (parse/validate miss only)
+					let repairErrors: string[] = [];
 
 					const agentControl = ctx.control?.registerAgent(id);
 					try {
 						for (let attempt = 0; attempt < attempts; attempt++) {
 							const res = await runHarnessAgent(ctx.harness, {
-								prompt: buildAgentPrompt(
-									prompt,
-									resolved.preamble,
-									opts.schema || null,
-									correction,
-								),
+								prompt:
+									repairFrom != null
+										? buildRepairPrompt(repairFrom, opts.schema, repairErrors)
+										: buildAgentPrompt(
+												prompt,
+												resolved.preamble,
+												opts.schema || null,
+												"",
+											),
 								cwd,
 								signal: agentControl?.signal || ctx.signal,
 							});
@@ -131,6 +144,7 @@ export function buildDsl(ctx) {
 							}
 
 							if (!res.ok) {
+								repairFrom = null; // host death: nothing to repair — re-run the full task
 								if (attempt === attempts - 1) {
 									ctx.progress.agentEnd(id, "error", res.error);
 									result = null;
@@ -147,7 +161,10 @@ export function buildDsl(ctx) {
 										ctx.progress.agentEnd(id, "error", "non-JSON output");
 										result = null;
 									}
-									correction = `Your previous reply was NOT valid JSON. Return ONLY a single JSON value matching the output schema, with no prose. Previous reply began: ${res.text.slice(0, 200)}`;
+									repairFrom = res.text;
+									repairErrors = [
+										"Your previous reply was not a single valid JSON value (it contained prose, code fences, or trailing text).",
+									];
 									continue;
 								}
 								const v = validate(data, opts.schema);
@@ -160,7 +177,8 @@ export function buildDsl(ctx) {
 										);
 										result = null;
 									}
-									correction = `Your previous reply did not match the output schema: ${v.errors.slice(0, 3).join("; ")}. Fix exactly these problems and return ONLY the corrected JSON.`;
+									repairFrom = res.text;
+									repairErrors = v.errors.slice(0, 8);
 									continue;
 								}
 								ctx.progress.agentEnd(id, "done");

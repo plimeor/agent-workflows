@@ -10,7 +10,8 @@ Scope in:
 - docs/decisions/002-run-runtime-contract.md — run runtime + the `agent-workflows mcp` control surface + security boundaries.
 - docs/decisions/003-harness-adoption.md — host-layer authority: select/detect/health/install/uninstall + subagent run delegated to `@plimeor/harness`; the engine is host-agnostic.
 - docs/decisions/004-single-package.md — structure authority: a single npm package with all source under `src/` (the monorepo collapsed once `@plimeor/harness` became external).
-- docs/plans/2026-06-24-runtime-gap-closure-plan.md — child-`workflow()` progress-grouping plan, now completed; kept as context, no longer open work.
+- docs/decisions/005-get-run-compact-projection.md — `get_run` read projection: a compact progress summary by default; `view:'full'` for the full `agents[]`/launch/log read. Refines the decision-002 MCP surface.
+- docs/decisions/006-schema-retry-repair-pass.md — schema-retry substrate: a repair pass (reshape the prior reply, no task re-run) supersedes 001's full-respawn description; host death still re-runs.
 - docs/requirements/2026-06-24-agent-workflows-port-requirement.md — the origin requirement (completed).
 
 Scope out:
