@@ -3,6 +3,28 @@
 This changelog is reconstructed from `package.json` version changes and the commits between those
 version boundaries.
 
+## 0.1.4 - 2026-06-28
+
+### Changed
+
+- Reframed the installed Agent Workflows skills around the upstream Workflow operating model: a
+  workflow is one well-scoped fan-out and the parent session stays in the orchestration loop across
+  turns (scout → fan out → read the result → decide the next), with the five chainable single-phase
+  shapes (Understand / Design / Review / Research / Migrate) named explicitly.
+- Narrowed the parent-session wait discipline to govern only an actively running run; scouting and
+  reading prior results in the parent before launching, and between chained workflows, is documented
+  as expected rather than discouraged.
+- Added a Scout → Bake → Structure → Launch authoring lifecycle and the "context pack" concept
+  (`WORK_UNITS` exact file/symbol pairs · `SHARED` systemic risk · `NOT_A_BUG` authorized
+  translations and known deferrals), so a review/audit fan-out hands each agent the files, the
+  systemic risk, and the not-a-bug list instead of making agents rediscover them.
+- Promoted the quality patterns from an optional menu to default per-task-class skeletons, including
+  a copy-ready deep-review skeleton (pipeline review → severity-asymmetric adversarial verify →
+  completeness critic → finished report) and an explicit "parts, not a ceiling" invitation to
+  compose novel harnesses.
+- Strengthened the `--budget` guidance: it is advisory and unmetered (`remaining()` never shrinks),
+  so a ported native `while (budget.remaining() > N)` loop would spin to the 1000-agent lifetime cap.
+
 ## 0.1.3 - 2026-06-28
 
 ### Changed
