@@ -6,10 +6,14 @@
 //   RETURN:<text>   final text for a non-schema agent
 //   FAIL            non-zero exit (a dead agent)
 //   FAILONCE        non-zero exit on the first call for this prompt, then succeeds
-//   BADJSON         emit invalid JSON (schema agents) to exercise parse-retry
+//   BADJSON         emit invalid JSON (schema agents) — unrepairable, exercises null-after-retry
+//   TYPEFAIL        emit content with number fields stringified (a TYPE error a repair pass fixes)
 //   SET <p>=<json>  override property <p> on the schema instance (schema agents)
 // A schema agent (the engine embeds "JSON Schema:\n{…}") gets a conforming instance built
-// from that schema, with SET overrides applied.
+// from that schema, with SET overrides applied. A schema RETRY feeds buildRepairPrompt (marked
+// "Reshape ONLY…"); the fake then reshapes the prior reply (extract + coerce existing keys to the
+// schema's types, NO fabrication of missing fields) instead of re-running the original task.
+import { extractJson } from "../src/engine";
 
 type FakeRunResult = { exitCode: number | null; finalText: string };
 
@@ -50,6 +54,46 @@ export function createFakeHarness() {
 		}
 	}
 
+	function coerce(v: unknown, t: unknown): unknown {
+		if (
+			(t === "number" || t === "integer") &&
+			typeof v === "string" &&
+			v.trim() !== "" &&
+			!Number.isNaN(Number(v))
+		)
+			return Number(v);
+		if (t === "boolean" && (v === "true" || v === "false")) return v === "true";
+		return v;
+	}
+
+	// Model the repair pass: pull the prior reply out of the repair prompt, extract whatever JSON
+	// it held, and return its existing keys coerced to the schema's types — WITHOUT inventing any
+	// missing required field. So an envelope/type error recovers; an unparseable reply or one that
+	// genuinely dropped a required field stays invalid and the engine returns null after attempts.
+	function repairReply(prompt: string, schemaJson: string): FakeRunResult {
+		const m = prompt.match(/Your previous reply:\n([\s\S]*?)\n\nReturn ONLY/);
+		const prior = m ? m[1] : "";
+		let data: unknown;
+		try {
+			data = extractJson(prior);
+		} catch {
+			return { exitCode: 0, finalText: prior }; // unrepairable → engine re-fails → null
+		}
+		if (!data || typeof data !== "object" || Array.isArray(data)) {
+			return { exitCode: 0, finalText: JSON.stringify(data) };
+		}
+		const schema = JSON.parse(schemaJson);
+		const props = (schema.properties || {}) as Record<string, any>;
+		const out: Record<string, unknown> = {};
+		for (const [k, v] of Object.entries(data as Record<string, unknown>)) {
+			const t = Array.isArray(props[k]?.type)
+				? props[k].type.find((x: string) => x !== "null")
+				: props[k]?.type;
+			out[k] = coerce(v, t);
+		}
+		return { exitCode: 0, finalText: JSON.stringify(out) };
+	}
+
 	function finalTextFor(prompt: string): FakeRunResult {
 		if (/(^|\s)FAIL(\s|$)/.test(prompt)) {
 			return { exitCode: 1, finalText: "" };
@@ -64,17 +108,12 @@ export function createFakeHarness() {
 
 		const schemaMatch = prompt.match(/JSON Schema:\n(.+)/);
 		if (schemaMatch) {
+			// A schema retry: buildRepairPrompt asks to reshape the prior reply, not redo the task.
+			if (/Reshape ONLY the content/.test(prompt)) {
+				return repairReply(prompt, schemaMatch[1]);
+			}
 			if (/BADJSON/.test(prompt)) {
 				return { exitCode: 0, finalText: "{not valid json" };
-			}
-			// SCHEMAFAILONCE: on the FIRST attempt (no correction yet in the prompt) emit JSON that
-			// parses but fails schema validation (empty object → missing required), so the engine's
-			// retry path is exercised; on the retry (the correction text is present) it conforms.
-			if (
-				/SCHEMAFAILONCE/.test(prompt) &&
-				!/did not match the output schema/.test(prompt)
-			) {
-				return { exitCode: 0, finalText: "{}" };
 			}
 			const schema = JSON.parse(schemaMatch[1]);
 			const obj = instanceFromSchema(schema) as Record<string, unknown>;
@@ -83,6 +122,16 @@ export function createFakeHarness() {
 					obj[m[1]] = JSON.parse(m[2]);
 				} catch {
 					obj[m[1]] = m[2];
+				}
+			}
+			// TYPEFAIL: emit otherwise-correct content with number/integer fields stringified, so the
+			// first reply fails validation on a TYPE error that a repair pass can coerce back.
+			if (/TYPEFAIL/.test(prompt)) {
+				const props = (schema.properties || {}) as Record<string, any>;
+				for (const k of Object.keys(obj)) {
+					const t = props[k]?.type;
+					if ((t === "number" || t === "integer") && typeof obj[k] === "number")
+						obj[k] = String(obj[k]);
 				}
 			}
 			return { exitCode: 0, finalText: JSON.stringify(obj) };

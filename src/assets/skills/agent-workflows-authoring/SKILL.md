@@ -75,9 +75,14 @@ One harness subagent (a single host text run). The subagent is told its final me
 return value, so it returns raw data, not prose.
 - No `schema` → returns the final **text** (string). A transient host-agent death is still
   retried once (up to 2 attempts) even without a schema.
-- `schema` (JSON Schema) → the engine embeds the schema in the prompt, then parses and validates
-  the reply host-side, retrying once (the retry prompt includes the prior failure), then returns
-  the **object** (or `null` on persistent failure).
+- `schema` (JSON Schema) → the engine embeds the schema in the prompt, then extracts and validates
+  the reply. On a parse/validate miss it runs **one repair pass** (up to 2 attempts total): it
+  re-prompts the agent with only its prior reply, the schema, and the exact validation errors and
+  asks it to **reshape** — not redo the task, so no file re-reads. The repair must not invent or drop
+  content, so an unsupported required field becomes `null` rather than a fabricated value; a reply
+  that genuinely omitted a required field therefore stays invalid. (A transient host **death** instead
+  re-runs the full original prompt — there is nothing to repair.) Returns the validated **object**, or
+  `null` on persistent failure.
 - Returns `null` if the agent dies after retries or the run is aborted.
 
 `opts`:
@@ -113,12 +118,18 @@ cross-item dependency, rewrite as one pipeline.
 
 ### `phase(title)` / `log(message)`
 `phase` opens a progress group; later agents group under it. `log` writes a narrator line.
+`phase()` sets a **single global cursor**, so inside a `parallel()`/`pipeline()` stage — where
+agents from different groups run concurrently — don't rely on it. Pass `opts.phase` explicitly on
+each `agent()` so it lands in the intended group (same phase string → same box); the skeletons
+below do this on every staged `agent()`.
 
 ### `workflow(nameOrRef, args?) → Promise<any>`
 Run another workflow inline; returns its result. Pass a name (resolved from local `workflows/`,
 packaged workflows, or the parent workflow's lookup roots) or
 `{ scriptPath }`. **One level only** — nested `workflow()` throws. Shares the run's
-concurrency cap, agent counter, abort signal, and token budget.
+concurrency cap, agent counter, abort signal, and token budget. Also throws on an unknown name, an
+unreadable `scriptPath`, or a child syntax error — wrap the call in `try/catch` if a missing or
+broken sub-workflow should degrade gracefully instead of aborting the whole run.
 
 ### `args` / `budget`
 `args` is the `--args`/`--args-file` value verbatim (`undefined` if unset). `budget` is
@@ -153,7 +164,7 @@ learned into the next** (see the lifecycle in the `agent-workflows` skill):
 | Shape | The fan-out |
 |---|---|
 | **Understand** | `parallel` readers over subsystems → return a structured map |
-| **Design** | `parallel` N approaches → judge panel → synthesize the winner |
+| **Design** | `parallel` N approaches → judge panel → synthesize the winner, grafting the best ideas from the runners-up |
 | **Review** | `pipeline(WORK_UNITS, review, verify)` → completeness critic → report (below) |
 | **Research** | multi-modal sweep → `pipeline(sources, read, refute-claims)` → cited synthesis |
 | **Migrate** | discover sites → `parallel` transform under `isolation:'worktree'` → verify each |
@@ -256,5 +267,5 @@ await parallel(sites.map(site => () =>
   `.agent-workflows/runs/<runId>/` (`status.json`, `result.json`, `journal.json`, `script.mjs`).
 - `agent-workflows doctor` checks the configured harness host is reachable (`--harness <id>` to
   diagnose a specific one).
-- A schema agent returning `null` means non-JSON/invalid output twice — tighten the prompt or
-  loosen the schema; inspect with a non-schema agent first.
+- A schema agent returning `null` means the reply failed to parse/validate and the repair pass
+  couldn't fix it — tighten the prompt or loosen the schema; inspect with a non-schema agent first.

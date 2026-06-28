@@ -148,6 +148,71 @@ test("T010: no waitMs performs exactly one read (single-shot)", async () => {
 	expect(run.runId).toBe(prepared.runId);
 });
 
+// ── T010b: get_run summary projection is compact; full view drills in ─────────
+test("T010b: default get_run returns a compact per-phase summary, not the full tree", async () => {
+	const prepared = await prepareRun({
+		source: VALID_SOURCE,
+		cwd: root,
+		detached: true,
+	});
+	// Synthesize a live status.json + a heavy progress.log tail like a running review.
+	await writeFile(
+		path.join(prepared.runDir, "status.json"),
+		JSON.stringify({
+			runId: prepared.runId,
+			name: "deep-review",
+			currentPhase: "Find",
+			phases: ["Find", "Verify", "Synthesize"],
+			narration: Array.from({ length: 12 }, (_, i) => ({
+				t: i,
+				message: `n${i}`,
+			})),
+			agents: [
+				{ id: "a1", label: "find:a", phase: "Find", state: "running" },
+				{ id: "a2", label: "find:b", phase: "Find", state: "running" },
+				{ id: "a3", label: "find:c", phase: "Find", state: "done" },
+				{ id: "a4", label: "verify:a", phase: "Verify", state: "queued" },
+			],
+		}),
+	);
+	await writeFile(
+		path.join(prepared.runDir, "progress.log"),
+		"┌─ Find\nverbose progress line\nverbose progress line\n".repeat(50),
+	);
+
+	// Default view (no `view`) → compact summary, even when logTailBytes is asked for.
+	const summary: any = await __testGetRunWithWait(root, prepared.runId, {
+		logTailBytes: 12000,
+	});
+	expect(summary.view).toBe("summary");
+	expect(summary.currentPhase).toBe("Find");
+	// Per-phase, non-zero state counts only.
+	expect(summary.phases).toEqual([
+		{ title: "Find", running: 2, done: 1 },
+		{ title: "Verify", queued: 1 },
+		{ title: "Synthesize" },
+	]);
+	// Narration capped to the last few lines.
+	expect(summary.narration).toEqual(["n7", "n8", "n9", "n10", "n11"]);
+	// The growing/heavy fields are absent — this is the token win.
+	expect(summary.status).toBeUndefined();
+	expect(summary.agents).toBeUndefined();
+	expect(summary.launch).toBeUndefined();
+	expect(summary.process).toBeUndefined();
+	expect(summary.progressLog).toBeUndefined();
+
+	// Full view → the unprojected read, including the agent tree and the log tail.
+	const full: any = await __testGetRunWithWait(root, prepared.runId, {
+		view: "full",
+		logTailBytes: 12000,
+	});
+	expect(full.view).toBeUndefined();
+	expect(full.status.agents).toHaveLength(4);
+	expect(full.launch).not.toBeNull();
+	expect(typeof full.progressLog).toBe("string");
+	expect(full.progressLog.length).toBeGreaterThan(0);
+});
+
 // ── T011: durable runId→cwd resolver across a fresh server (no in-memory state) ──
 test("T011: resolveRunCwd resolves a run created under an authorized root != process.cwd()", async () => {
 	const prepared = await prepareRun({
