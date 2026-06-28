@@ -26,16 +26,53 @@ independent verification:
 - A design decision worth exploring from several angles before choosing.
 - Any "be thorough / be comprehensive" request over a wide surface.
 
-The right move is often **hybrid**: scout inline first (list the files, find the channels,
-scope the diff) to discover the work-list, THEN author a workflow to pipeline over it. You
-don't need the shape before the *task* — only before the *orchestration step*.
-
 ## When NOT to use it
 
 - A single atomic task, a one-file edit, or a quick fact lookup — just do it directly.
 - A task where you already know the one file/symbol/value — search directly.
 - Trivial mechanical edits. Workflows spawn many host runs and consume real tokens;
   the scale should match the request.
+
+## The operating model: you stay in the loop
+
+A workflow is **one well-scoped fan-out, not the whole job.** You stay in the orchestration loop
+across turns: scout → run a fan-out → read its result → decide and run the next. You don't need to
+know the shape before the *task* — only before the *orchestration step*.
+
+The single-phase shapes you chain:
+
+| Shape | One fan-out that… |
+|---|---|
+| **Understand** | parallel readers over subsystems → a structured map |
+| **Design** | N independent approaches → judged → synthesis |
+| **Review** | dimensions → find → adversarially verify each finding |
+| **Research** | multi-modal source sweep → deep-read → cited synthesis |
+| **Migrate** | discover sites → transform each (worktree) → verify |
+
+For larger work, run several in sequence — **read each result before deciding the next fan-out.**
+"understand → design → implement → review" is usually several workflows, one per phase, so you stay
+in the loop between them.
+
+**Scouting in the parent session is required before a fan-out, and is not "duplicate evidence."**
+Listing the exact files, scoping the diff, finding the systemic risk — that is how you discover the
+work-list. What you learn gets **baked into the script** you hand the agents.
+
+### The authoring lifecycle: Scout → Bake → Structure → Launch
+
+For any comprehensive / review / audit / migration fan-out:
+
+1. **Scout** (parent session) — discover three things: the **work-list** (the exact files/symbols
+   each agent must read, not vague areas), the **domain invariants / systemic risk** (the one or two
+   facts that drive most of the findings), and the **not-a-bug list** (authorized translations and
+   known/accepted deferrals).
+2. **Bake** — fix those three into script constants — the **context pack**: `WORK_UNITS` (concrete
+   file/symbol pairs per agent), `SHARED` (the systemic risk + what to hunt, injected into every
+   prompt), `NOT_A_BUG` (what must not be reported). The quality bar: **an agent should never have to
+   rediscover which files to read or what the systemic risk is. If it does, the script
+   under-specified the work** — that belongs in the context pack, not in each agent's budget.
+3. **Structure** — pick the skeleton. For review/audit the default is `pipeline(review → verify) →
+   completeness critic → report`. See `agent-workflows-authoring` for copy-ready skeletons.
+4. **Launch & relay** — start the run; now the wait discipline below applies.
 
 ## How to run one
 
@@ -59,23 +96,6 @@ agent-workflows MCP tools:
    timeout. For a long run, remind the user they can follow it live with
    `agent-workflows watch <runId> --follow`.
 
-## Parent-session wait discipline
-
-Once a workflow run starts, treat the workflow as the source of investigation and verification. The
-parent session's active responsibilities are narrow: poll or watch the run, relay concise progress,
-and handle explicit user requests to pause, stop, resume, restart, or inspect workflow state.
-
-Do not read files, search the codebase, run tests, inspect non-workflow logs, or perform independent
-cross-checks while waiting for an active run. That work belongs inside the workflow agents; doing it
-in the parent session fills the main context with duplicate evidence and defeats the point of
-delegation. If you discover after launch that more context is needed, say so and use a visible
-workflow action: wait for completion, ask to stop/pause and revise, resume, or start a follow-up
-workflow.
-
-Do not stop a run or an agent just because it has been running a long time, because a bounded poll
-returned before terminal completion, or because the host appears quiet. Long-running agents are normal.
-Before issuing `stop-run` or `stop-agent`, ask the user for confirmation and wait for an explicit yes.
-
 Or, from a shell, the equivalent CLI:
 
 ```
@@ -92,29 +112,73 @@ The CLI route writes the script to a file (e.g. `.agent-workflows/tmp/<task>.mjs
 `runId`. To iterate, edit the script and `agent-workflows resume <runId>` — unchanged `agent()`
 calls replay instantly.
 
+## Wait discipline — for a running run only
+
+Once a run is active, treat **that run** as the source of its own investigation. The parent
+session's active responsibilities are narrow: poll or watch the run, relay concise progress, and
+handle explicit user requests to pause, stop, resume, restart, or inspect workflow state.
+
+Do not bypass a running run with duplicate searching, reading, or cross-checking in the parent — that
+work is already happening inside the agents, and duplicating it fills the main context with evidence
+you'll get back anyway.
+
+This governs a **running** run. It does **not** forbid the parent loop itself: before you launch, and
+between chained workflows, **scouting and reading prior results in the parent is expected** — that is
+how you build the next fan-out's context pack. If you discover mid-run that the script is
+under-specified, don't quietly start investigating in parallel; finish or stop the run, bake what's
+missing into the script, and relaunch.
+
+Do not stop a run or an agent just because it has been running a long time, because a bounded poll
+returned before terminal completion, or because the host appears quiet. Long-running agents are normal.
+Before issuing `stop-run` or `stop-agent`, ask the user for confirmation and wait for an explicit yes.
+
 ## The script in one screen
+
+A review fan-out with its scouting **baked in** — the agents are handed the files, the systemic
+risk, and the not-a-bug list; they never rediscover them:
 
 ```js
 export const meta = {
-  name: 'review-changes',
-  description: 'Review changed files across dimensions, verify each finding',
-  phases: [{ title: 'Review' }, { title: 'Verify' }],   // titles match phase() calls
+  name: 'parity-review',
+  description: 'Parity-review a migration per area, adversarially verify, then report',
+  phases: [{ title: 'Review' }, { title: 'Verify' }, { title: 'Report' }],   // titles match phase()
 }
 
-const DIMENSIONS = [{ key: 'bugs', prompt: '…' }, { key: 'perf', prompt: '…' }]
+// ── Context pack: baked from scouting, not rediscovered by agents ──
+const SHARED = `Systemic risk: v4 call sites check {code} and never throw; the target THROWS on
+error — so EVERY call site must be remapped to try/catch. Hunt: dropped else-branch (silent error),
+swallowed catch, flipped control flow, lost showErrorMsg intent.`
+const NOT_A_BUG = `Authorized translations (not findings): <list>. Known deferrals (do not report
+as bugs): <list>.`
+const UNITS = [                                   // concrete file pairs, one per agent — not "areas"
+  { key: 'create-order', focus: 'order placement + 30s quote polling + 3DS',
+    sources: ['/v4/.../component.tsx'], targets: ['/web/.../component.tsx', '/web/.../service.ts'] },
+  // … one entry per area, each with the EXACT files to diff
+]
+const reviewPrompt = u => [SHARED, `Area: ${u.focus}`,
+  `v4 source (read in full): ${u.sources.join(', ')}`,
+  `target (read in full): ${u.targets.join(', ')}`,
+  'Diff behavior line by line; report only real regressions, with file:symbol evidence.',
+  NOT_A_BUG].join('\n')
+
 const results = await pipeline(
-  DIMENSIONS,
-  d => agent(d.prompt, { label: `review:${d.key}`, phase: 'Review', schema: FINDINGS }),
-  review => parallel(review.findings.map(f => () =>
-    agent(`Adversarially verify: ${f.title}`, { phase: 'Verify', schema: VERDICT })
+  UNITS,
+  u => agent(reviewPrompt(u), { label: `review:${u.key}`, phase: 'Review', schema: FINDINGS }),
+  (review, u) => parallel((review?.findings ?? []).map(f => () =>
+    agent(`Adversarially REFUTE this finding (default to refuted if unsure):\n${JSON.stringify(f)}`,
+          { label: `verify:${u.key}`, phase: 'Verify', schema: VERDICT })
       .then(v => ({ ...f, verdict: v })))),
 )
-return { confirmed: results.flat().filter(Boolean).filter(f => f.verdict?.isReal) }
+const confirmed = results.flat().filter(Boolean).filter(f => f.verdict && !f.verdict.refuted)
+
+// Terminal stage returns the FINISHED report in the user's language — not JSON for the parent to render.
+return await agent(`Write the final review report (user's language) from these confirmed findings.
+Cite file:symbol for every claim; order money/correctness issues first:\n${JSON.stringify(confirmed)}`,
+  { label: 'report', phase: 'Report' })
 ```
 
-`meta` must be the first statement and a **pure literal** (no variables or calls). The body
-is plain JS in an async context: `await` at top level, and a top-level `return` is the
-workflow's result.
+`meta` must be the first statement and a **pure literal** (no variables or calls). The body is
+plain JS in an async context: `await` at top level, and a top-level `return` is the workflow's result.
 
 ## The DSL (injected globals)
 
@@ -140,6 +204,39 @@ genuinely needs ALL of stage N-1 at once (dedup/merge across the full set, early
 zero, "compare against the other findings"). "I need to flatten/filter first" is NOT a
 barrier — do it inside a pipeline stage.
 
+## Structure: default skeletons, composed from patterns
+
+Start each fan-out from its task-class skeleton, then adjust:
+
+- **Review / audit** → `pipeline(WORK_UNITS, review, adversarial-verify) → completeness critic →
+  report`. Verify **every** finding; spend more verification on the high-severity ones. The
+  terminal stage returns the **finished report**, not JSON.
+- **Research** → multi-modal source sweep → deep-read each source → cited synthesis, with a
+  refute pass on load-bearing claims.
+- **Migration** → discover sites → transform each under `isolation:'worktree'` → verify each →
+  report what was skipped.
+
+The patterns these skeletons compose from:
+- **Adversarial verify** — N independent skeptics per finding, each prompted to REFUTE, defaulting
+  to refuted when unsure; keep only if a majority fail to refute. Spend extra votes on high-severity.
+- **Perspective-diverse verify** — give each verifier a distinct lens (correctness, security, repro)
+  instead of N identical refuters.
+- **Completeness critic** — a final agent that asks "what's missing — area not covered, claim
+  unverified, deferral that's actually a live path?"; its answer is the next round of work.
+- **Loop-until-dry** — keep spawning finders until K consecutive rounds find nothing new; dedup
+  against everything *seen* (not just confirmed), or it never converges.
+- **Multi-modal sweep** — parallel agents each searching a different way (by-container, by-content,
+  by-entity, by-time).
+- **Judge panel** — N independent attempts from different angles, scored by parallel judges,
+  synthesized from the winner.
+
+These are **parts, not a ceiling.** Compose novel harnesses when the task calls for it — tournament
+brackets, self-repair loops, staged escalation, whatever fits.
+
+Scale to the request: "find any bugs" → a few finders + single-vote verify; "thoroughly audit" → a
+larger finder pool + a 3–5 vote adversarial pass + a completeness critic + a report stage. **Log what
+you drop** (top-N, no-retry, sampling) — silent truncation reads as "covered everything" when it didn't.
+
 ## Limits & determinism (know these)
 
 - Concurrency cap `min(16, cores-2)`; excess `agent()` calls queue. Lifetime cap 1000
@@ -147,33 +244,14 @@ barrier — do it inside a pipeline stage.
 - `Date.now()`, `Math.random()`, and argless `new Date()` **throw** inside scripts (they
   break resume). Pass timestamps/seeds via `args`; vary by index for pseudo-randomness.
 - Scripts are **plain JS, not TS**. No filesystem/Node APIs inside the script — only the DSL.
+- `budget` is **advisory, not metered**: `spent()` stays `0` and `remaining()` equals `total`,
+  forever. Read `budget.total` once to size a static fan-out. **Do not** port a native
+  `while (budget.remaining() > N)` loop — here it never shrinks, so it would spin straight to the
+  1000-agent lifetime cap.
 - The host harness owns each subagent's sandbox; agent-workflows does not set one. Use
   `isolation:'worktree'` for **parallel** mutators that would otherwise conflict on the shared
   checkout — write capability still depends on the host being configured to allow edits.
 
-## Quality patterns (compose freely)
-
-- **Adversarial verify** — N independent skeptics per finding, each prompted to REFUTE; keep
-  only if a majority fail to refute. Stops plausible-but-wrong findings.
-- **Perspective-diverse verify** — give each verifier a distinct lens (correctness, security,
-  perf, repro) instead of N identical refuters.
-- **Judge panel** — generate N independent attempts from different angles, score with
-  parallel judges, synthesize from the winner.
-- **Loop-until-dry** — keep spawning finders until K consecutive rounds find nothing new;
-  dedup against everything *seen* (not just confirmed), or it never converges.
-- **Multi-modal sweep** — parallel agents each searching a different way (by-container,
-  by-content, by-entity, by-time).
-- **Completeness critic** — a final agent that asks "what's missing?"; its answer is the
-  next round of work.
-- **Budget-scaled fan-out** — read `budget.total` once and derive a static breadth
-  (`const n = budget.total ? Math.floor(budget.total / 80_000) : 4`); do not loop on
-  `remaining()`, which never shrinks (usage is not metered).
-
-Scale to the request: "find any bugs" → a few finders + single-vote verify; "thoroughly
-audit" → a larger finder pool + 3–5 vote adversarial pass + a synthesis stage. Log what you
-drop (top-N, no-retry, sampling) — silent truncation reads as "covered everything" when it
-didn't.
-
-See `agent-workflows-authoring` for the full DSL reference and more recipes, and
+See `agent-workflows-authoring` for the full DSL reference and copy-ready skeletons, and
 `docs/decisions/001-workflow-dsl-fidelity-contract.md` for the exact mapping to the original
 Workflow mechanism.
