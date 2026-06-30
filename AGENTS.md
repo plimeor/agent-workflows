@@ -7,7 +7,8 @@ subagents. Subagents run on a host via the external `@plimeor/harness` SDK (Code
 engine itself never names a host.
 
 This file orients an agent **developing this codebase**. To learn how to *use* workflows, read the
-README and the bundled skills; for the durable design rationale, read `docs/decisions/`.
+README and the bundled skills; for the current collaboration cursor read `.agentdocs/cursor.md`,
+and for durable design rationale read `DECISIONS.xml`.
 
 ## Stack
 
@@ -31,7 +32,8 @@ README and the bundled skills; for the durable design rationale, read `docs/deci
   - `src/assets/{skills,hooks}` — installed into a host by `install`.
 - `workflows/` — bundled example workflows.
 - `test/` — engine/CLI/eval tests, driven by an in-process fake harness (no host CLI, no tokens).
-- `evals/` — the fair Codex-vs-Claude eval harness. `docs/` — the agentic document set.
+- `evals/` — the fair Codex-vs-Claude eval harness.
+- `.agentdocs/` — the current collaboration working tree. `DECISIONS.xml` — the durable decision ledger.
 
 ## Commands
 
@@ -43,16 +45,19 @@ README and the bundled skills; for the durable design rationale, read `docs/deci
 
 - **The engine stays host-agnostic.** It programs against `@plimeor/harness`'s `process.run` only
   (the `agent-run.ts` seam) and must never name or import a specific host (`codex` / `claude` / …).
-  Host specifics live in `@plimeor/harness`. (`docs/decisions/003`)
-- The script-facing **DSL contract** is stable authority (`docs/decisions/001`) — don't change the
+  Host specifics live in `@plimeor/harness`. (`DECISIONS.xml` decision 003)
+- The script-facing **DSL contract** is stable authority (`DECISIONS.xml` decision 001) — don't change the
   meaning of the injected globals; the in-script determinism guards (no `Date.now` / `Math.random`)
   and the resume journal depend on it.
 - The **MCP run-control surface** and security boundaries — cwd realpath-sealing under authorized
-  roots, fail-closed inline-source lint — are governed by `docs/decisions/002`.
+  roots, fail-closed inline-source lint — are governed by `DECISIONS.xml` decision 002.
 
 ## Documents
 
-- To orient, read `docs/agent/current.md` (the cursor) then `docs/index.md` first.
+- To orient, read `.agentdocs/cursor.md` first, then the active docs it links.
+- Active Requirements live under `.agentdocs/requirements/`. Plans and Tasking are temporary and are
+  deleted after consolidation when completed.
+- Decisions live only in `DECISIONS.xml`. Filter `status="active"` for current authority.
 - **Decisions are append-only, point-in-time records.** Never edit an old decision to "correct"
-  drift — that creates perpetual maintenance cost. Record new reality in a *new* decision (highest
-  number = newest); the newest decisions reflect current reality, older ones are dated history.
+  drift. Record new reality in a new decision, and supersede older records with lifecycle attributes
+  when they answer the same durable question.

@@ -87,10 +87,11 @@ const askedBreadth = Number.isFinite(a.breadth)
 	: 5;
 let breadth = askedBreadth;
 if (budget.total) {
-	// ~80k output tokens is a rough cost for one angle's full search+verify chain.
+	// ~150k output tokens is a rough cost for one angle's full chain: search + its
+	// dedup share + VERIFIERS_PER_CLAIM independent checkers per resulting claim.
 	const affordable = Math.max(
 		1,
-		Math.min(5, Math.floor(budget.total / 80_000)),
+		Math.min(5, Math.floor(budget.total / 150_000)),
 	);
 	if (affordable < breadth) {
 		breadth = affordable;
@@ -105,6 +106,10 @@ if (selectedAngles.length < ANGLES.length) {
 		`covering ${selectedAngles.length}/${ANGLES.length} angles: ${selectedAngles.map((x) => x.key).join(", ")}`,
 	);
 }
+
+// How many INDEPENDENT adversarial checkers vote on each claim. Odd so a strict
+// majority is always decisive; genuine disagreement falls through to "unverified".
+const VERIFIERS_PER_CLAIM = 3;
 
 // ---- schemas --------------------------------------------------------------
 const SOURCE = {
@@ -247,10 +252,11 @@ function dedupPrompt(rawClaims) {
 	].join("\n");
 }
 
-function verifyPrompt(claim) {
+function verifyPrompt(claim, idx = 0, total = 1) {
 	return [
-		`You are an adversarial fact-checker. Your job is to TRY TO REFUTE the claim below using`,
-		`INDEPENDENT evidence — sources OTHER than the ones already attached to it.`,
+		`You are adversarial fact-checker #${idx + 1} of ${total}, working INDEPENDENTLY of the others.`,
+		`Your job is to TRY TO REFUTE the claim below using INDEPENDENT evidence — sources OTHER`,
+		`than the ones already attached to it.`,
 		``,
 		`CLAIM: ${claim.claim}`,
 		`ORIGINAL SOURCES (do not just re-read these — find your own):`,
@@ -286,6 +292,41 @@ function synthesisPrompt(verifiedClaims) {
 		``,
 		`Output ONLY the report Markdown — it is consumed directly as the result, so no preamble or sign-off.`,
 	].join("\n");
+}
+
+// ---- verdict aggregation over a claim's independent checkers ---------------
+function tallyVerdicts(votes) {
+	const counts = { supported: 0, refuted: 0, unverified: 0 };
+	for (const v of votes) {
+		if (v && counts[v.verdict] !== undefined) counts[v.verdict] += 1;
+	}
+	return counts;
+}
+
+// Strict majority wins; no majority (genuine disagreement, or no votes) → unverified.
+function aggregateVerdict(votes) {
+	const counts = tallyVerdicts(votes);
+	const total = counts.supported + counts.refuted + counts.unverified;
+	if (total === 0) return "unverified";
+	if (counts.refuted * 2 > total) return "refuted";
+	if (counts.supported * 2 > total) return "supported";
+	return "unverified";
+}
+
+// Union of the independent corroborating sources across checkers, deduped by URL.
+function unionSources(votes) {
+	const out = [];
+	const seen = new Set();
+	for (const v of votes) {
+		const list = v && Array.isArray(v.corroborating) ? v.corroborating : [];
+		for (const s of list) {
+			if (s && s.url && !seen.has(s.url)) {
+				seen.add(s.url);
+				out.push(s);
+			}
+		}
+	}
+	return out;
 }
 
 // ===========================================================================
@@ -348,24 +389,40 @@ if (!claims.length) claims = rawClaims;
 log(`deduped to ${claims.length} canonical claims`);
 
 // ===========================================================================
-// (3) VERIFY — adversarially fact-check each claim with an INDEPENDENT agent.
-//     No barrier needed across claims, so use pipeline: each claim flows
-//     gather→verdict on its own, and verification starts as soon as it is ready.
+// (3) VERIFY — adversarially fact-check each claim with VERIFIERS_PER_CLAIM
+//     INDEPENDENT checkers, then take a majority verdict (genuine disagreement
+//     → "unverified"). No barrier ACROSS claims, so use pipeline: each claim
+//     flows gather→verdict on its own. The parallel() inside is a barrier only
+//     over the checkers of a SINGLE claim — all its votes are needed to tally it.
 // ===========================================================================
 phase("Verify");
 const verified = (
 	await pipeline(claims, (claim) =>
-		agent(verifyPrompt(claim), {
-			label: `verify:${claim.claim.slice(0, 32)}`,
-			phase: "Verify",
-			schema: VERDICT_SCHEMA,
-		}).then((v) => ({
-			claim: claim.claim,
-			sources: claim.sources,
-			verdict: (v && v.verdict) || "unverified",
-			rationale: (v && v.rationale) || "verification agent returned no result",
-			corroborating: v && Array.isArray(v.corroborating) ? v.corroborating : [],
-		})),
+		parallel(
+			Array.from(
+				{ length: VERIFIERS_PER_CLAIM },
+				(_unused, i) => () =>
+					agent(verifyPrompt(claim, i, VERIFIERS_PER_CLAIM), {
+						label: `verify:${i + 1}:${claim.claim.slice(0, 28)}`,
+						phase: "Verify",
+						schema: VERDICT_SCHEMA,
+					}),
+			),
+		).then((rawVotes) => {
+			const votes = rawVotes.filter(Boolean);
+			return {
+				claim: claim.claim,
+				sources: claim.sources,
+				verdict: aggregateVerdict(votes),
+				votes: tallyVerdicts(votes),
+				rationale:
+					votes
+						.map((v) => v.rationale)
+						.filter(Boolean)
+						.join(" | ") || "verification agents returned no result",
+				corroborating: unionSources(votes),
+			};
+		}),
 	)
 ).filter(Boolean);
 

@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<decisions>
+  <decision id="001" status="active" date="2026-06-24">
+    <title>Workflow DSL fidelity contract</title>
+    <chosen>Agent Workflows preserves the script-facing semantics of Claude Code Workflow: a plain JavaScript workflow script with a pure-literal meta block, injected DSL globals, deterministic replay, fan-out scheduling, subagent return values, progress reporting, and optional worktree isolation. Host-specific execution details must not change the meaning of agent, parallel, pipeline, phase, log, workflow, args, or budget. Later records refine the substrate: decision 003 delegates host execution to @plimeor/harness, and decision 006 changes schema retry from a full task rerun to a repair pass.</chosen>
+    <rejected>
+      <option>Treat the implementation as a native clone of one host harness. That hides substrate differences that affect process isolation, schema retries, and progress integration.</option>
+      <option>Expose host substrate differences as changes to the workflow DSL. That weakens portability and makes workflow scripts harder to move between agents.</option>
+      <option>Keep fidelity facts only in implementation plans. Stable script-facing behavior is durable authority and belongs in the decision ledger.</option>
+    </rejected>
+    <non-goals>
+      <item>Byte-for-byte parity with Claude Code internals.</item>
+      <item>Native Claude Code UI behavior when this package exposes CLI, MCP, and durable run-file surfaces.</item>
+      <item>Removing safety and execution controls that the selected host or local runtime requires.</item>
+    </non-goals>
+    <contract>
+      <item>Scripts are plain JavaScript modules with a pure-literal export const meta. The body runs in an async VM context, and top-level return is the workflow result.</item>
+      <item>The script VM exposes only the workflow DSL and common safe JavaScript built-ins. Date.now, Math.random, and argless new Date throw because they would break deterministic replay. Node APIs such as fs, process, require, and import are not exposed.</item>
+      <item>agent(prompt, opts) returns final text without a schema, a validated object with a schema, or null when the agent is skipped, stopped, or terminally fails after retries. profile contributes a builtin prompt preamble. model, effort, sandbox, and per-agent MCP policy are not engine inputs; host execution belongs to @plimeor/harness.</item>
+      <item>parallel(thunks) is a barrier. Each thunk runs concurrently under the global semaphore and resolves to null rather than rejecting if it throws.</item>
+      <item>pipeline(items, ...stages) has no barrier between stages. Each item flows through all stages independently; a throwing stage drops that item to null and skips its remaining stages.</item>
+      <item>phase(title) sets the default progress phase for later agent calls. log(message) writes narrator progress. workflow(ref, args) runs one child workflow inline with shared concurrency, counters, budget object, abort signal, and journal; nested child workflows beyond one level are rejected.</item>
+      <item>args is the run input verbatim. budget exposes total, spent(), and remaining(); under the current harness, no token usage is reported, so budget accounting remains structurally present but the ceiling is dormant until usage is wired back in.</item>
+      <item>Concurrency is capped at min(16, cpu_cores - 2) with a floor of 1. A run may launch at most 1000 live agents. A single parallel or pipeline call accepts at most 4096 items.</item>
+      <item>Resume uses a content-addressed journal keyed by prompt plus result-affecting options. Same script, same args, and same flags produce a full cache hit; independent unchanged calls can still hit even if an earlier independent call changed.</item>
+      <item>isolation: "worktree" gives an agent a temporary git worktree rooted at HEAD; unchanged worktrees are removed, changed worktrees are kept and reported.</item>
+    </contract>
+  </decision>
+
+  <decision id="002" status="active" date="2026-06-24" builds-on="001">
+    <title>Run runtime and MCP control surface</title>
+    <chosen>Agent Workflows uses a shared runtime for CLI and MCP control. Long-running workflows run in detached processes and are represented by durable run files under .agent-workflows/runs. RunControl prepares and starts runs, RunStore reads durable state, and the MCP server exposes bounded start, lint, resume, get, list, and control tools. The runtime's durable files are the authority for progress, result, resume, and control state.</chosen>
+    <rejected>
+      <option>Keep an MCP tool call alive without bound until a workflow finishes. That would make completion depend on request lifetime instead of durable state. Bounded waiting on get_run is allowed.</option>
+      <option>Treat control.json as the command queue. A single mutable file can lose intermediate intent, so control commands are append-only files under control/ with control.json only as the latest-intent snapshot.</option>
+      <option>Accept raw host config, arbitrary shell callbacks, or user-defined profile registries in public MCP inputs. Those would cross the runtime policy boundary.</option>
+      <option>Let plugin hooks own completion notification or run validity. Hooks can surface context, but durable run files remain authoritative.</option>
+    </rejected>
+    <non-goals>
+      <item>Changing the DSL behavior governed by decision 001.</item>
+      <item>Providing an unbounded MCP or host-policy passthrough through public workflow inputs.</item>
+      <item>Making hooks a substitute for runtime state, control, or completion records.</item>
+    </non-goals>
+    <contract>
+      <item>Run directories contain launch.json, process.json, heartbeat.json, status.json, result.json, journal.json, progress.log, script.mjs, and append-only control command files.</item>
+      <item>agent_workflows_start_run starts a detached run from a named workflow, scriptRef, or fail-closed linted inline source, then returns runId, pid, runDir, and resource URIs.</item>
+      <item>agent_workflows_lint statically validates inline DSL source without running it.</item>
+      <item>agent_workflows_resume_run starts a detached run from a prior run's saved script and journal.</item>
+      <item>agent_workflows_get_run reads durable state, optionally waiting up to a bounded waitMs cap. Its default projection is refined by decision 005.</item>
+      <item>agent_workflows_list_runs lists recent runs for a workspace cwd. agent_workflows_control_run enqueues stop-run, pause-admission, resume-admission, stop-agent, or restart-agent.</item>
+      <item>Resources expose status, result, progress-log, script, and journal through agent-workflows://runs/{runId}/{kind} URIs.</item>
+      <item>cwd and scriptRef are realpath-normalized and sealed to authorized roots. concurrency is accepted only as a finite positive integer and clamped by the engine. Public sandbox and raw host config are not part of the current MCP input surface.</item>
+    </contract>
+  </decision>
+
+  <decision id="003" status="active" date="2026-06-25">
+    <title>Delegate the host layer to @plimeor/harness</title>
+    <chosen>Agent Workflows delegates the host layer to the published @plimeor/harness package. Harness selection, detection, health, install, uninstall, and each subagent text run are outside the engine. The engine consumes a harness handle through process.run, passes prompt and cwd, reads final text and exit code, and keeps schema validation, retry, progress, journal, workflow scheduling, and run control inside this package.</chosen>
+    <rejected>
+      <option>Keep an in-repo HostInstaller, CodexHostInstaller, and template-based install/uninstall stack. @plimeor/harness already owns multi-host install safety, conflict handling, rollback, and locking.</option>
+      <option>Keep an internal Codex runner and MCP policy compiler. The chosen boundary is a host-agnostic text run; Codex-specific flags and policy are harness responsibility.</option>
+      <option>Modify @plimeor/harness from this repository to recover per-run usage, model, effort, sandbox, or MCP scoping. It is an external dependency and was not authorized for this package-level decision.</option>
+    </rejected>
+    <non-goals>
+      <item>Changing the Workflow DSL contract.</item>
+      <item>Keeping Codex compatibility paths or CODEX-specific runtime branches inside the engine.</item>
+      <item>Vendoring or modifying @plimeor/harness.</item>
+    </non-goals>
+    <contract>
+      <item>agent() maps to one harness process.run text request. ok means the harness result exitCode is 0.</item>
+      <item>AbortSignal kills the live harness run through the harness run handle.</item>
+      <item>Profiles contribute prompt preambles only. The host owns sandboxing and model selection.</item>
+      <item>The journal key includes schema, profile, profile fingerprint, profile set version, and worktree isolation. It intentionally excludes model, effort, sandbox, and MCP policy because those are no longer engine inputs.</item>
+    </contract>
+  </decision>
+
+  <decision id="004" status="superseded" date="2026-06-26" superseded-by="007">
+    <title>Collapse the monorepo into one npm package</title>
+    <chosen>After @plimeor/harness became external, the repository collapsed from a core plus CLI monorepo into a single @plimeor/agent-workflows npm package. The package is Bun-native, ships TypeScript source directly, and has one package.json.</chosen>
+    <rejected>
+      <option>Keep the two-package monorepo. Once harness abstraction moved out, the split mostly preserved workspace dependency and release coordination cost without meaningful separation.</option>
+      <option>Bundle core into CLI with bun build. Bun can run the TypeScript sources directly, so build artifacts are unnecessary.</option>
+    </rejected>
+    <non-goals>
+      <item>Changing the engine, DSL, or harness boundary.</item>
+      <item>Introducing a build step.</item>
+    </non-goals>
+    <revisit>Superseded by decision 007 because the concrete source and asset paths recorded in this point-in-time structure decision drifted from the current package layout.</revisit>
+  </decision>
+
+  <decision id="005" status="active" date="2026-06-28" builds-on="002">
+    <title>agent_workflows_get_run defaults to a compact projection</title>
+    <chosen>agent_workflows_get_run returns a compact progress summary by default instead of the full getRun object. The summary contains state, currentPhase, updatedAt, per-phase agent state counts, recent narration, terminal result when present, and view: "summary". view: "full" is the explicit drill-down path for the complete agents list, launch, process, heartbeat, control, and progress log tail.</chosen>
+    <rejected>
+      <option>Keep the default full payload and add view: "summary". The caller that polls repeatedly should get the cheaper bounded shape by default.</option>
+      <option>Only change guidance by asking callers to poll less often. That lowers frequency but not per-poll size; agents[] and log tails still grow across a long run.</option>
+      <option>Shrink status.json or getRun core. CLI watch and ps consume the full progress tree, so projection belongs at the MCP read boundary.</option>
+    </rejected>
+    <non-goals>
+      <item>Changing durable run file shapes.</item>
+      <item>Changing bounded waitMs, includeResult, or logTailBytes semantics except that summary ignores logTailBytes.</item>
+      <item>Changing MCP resources for direct full reads.</item>
+    </non-goals>
+    <impact>Long parent sessions can relay progress from bounded summaries instead of accumulating full agent trees and append-only log tails on every poll.</impact>
+  </decision>
+
+  <decision id="006" status="active" date="2026-06-28" builds-on="001 003">
+    <title>Schema retry is a repair pass</title>
+    <chosen>For schema-bound agent() calls, parse or validation failure on an otherwise successful host run triggers one repair pass that reshapes the previous reply into the requested JSON Schema. The repair prompt includes the subagent preamble, previous reply, schema, and exact validation errors. It omits the original task prompt and profile preamble, and instructs the agent not to redo analysis, read new context, invent missing content, or drop existing content. Host process failure still reruns the original task because there is no prior reply to repair.</chosen>
+    <rejected>
+      <option>Rerun the full original task on schema failure. That repeats file reads and reasoning just to fix a JSON envelope.</option>
+      <option>Add the prior output to the old full-task correction prompt. That preserves analysis but still resends the original task and repeats the expensive part.</option>
+      <option>Use a host-native in-conversation structured-output retry. That would make the engine depend on host-specific tool retry behavior, violating decision 003.</option>
+      <option>Only loosen parsing without a model repair pass. It helps code fences and trailing text but not shape or type errors.</option>
+    </rejected>
+    <non-goals>
+      <item>Changing the public agent(prompt, { schema }) contract.</item>
+      <item>Changing the attempt count from two.</item>
+      <item>Changing journal keys; repair prompts never enter the resume key.</item>
+    </non-goals>
+    <tradeoff>If the first reply completely omits a required field, the repair pass must not fabricate it. It may return null or an empty value and still fail validation, so recovery for that rare case is lower than a full rerun. The chosen safety invariant is to preserve evidence over inventing schema fields.</tradeoff>
+  </decision>
+
+  <decision id="007" status="active" date="2026-07-01" supersedes="004" builds-on="003">
+    <title>Current single-package source and asset layout</title>
+    <chosen>The current package layout is a single Bun-native npm package named @plimeor/agent-workflows. The CLI binary points to src/cli/cli.ts, the library export and module entry point point to src/engine/index.ts, engine code lives under src/engine, CLI and MCP code live under src/cli, installed hooks and skills live under src/assets, example workflows live under workflows, and package publishing includes src, workflows, and license files. There is no root assets directory and no in-repo packages/core or packages/cli boundary.</chosen>
+    <rejected>
+      <option>Keep decision 004 active as the structure authority. It records the single-package direction correctly, but its concrete bin, export, and asset paths no longer match package.json or the tree.</option>
+      <option>Recreate a root assets directory to match the older decision. The package already ships assets through src/assets, and package.json includes src.</option>
+      <option>Restore packages/core and packages/cli. Decision 003 keeps the package-level rationale for a single package intact.</option>
+    </rejected>
+    <non-goals>
+      <item>Changing public workflow script syntax.</item>
+      <item>Changing the host-agnostic harness boundary.</item>
+      <item>Changing the MCP run-control contract.</item>
+      <item>Introducing a build step or generated distribution directory.</item>
+    </non-goals>
+    <evidence>Observed on 2026-07-01 in package.json and the repository tree: bin maps to ./src/cli/cli.ts, exports maps to ./src/engine/index.ts, files includes src and workflows, src/assets exists, and root assets does not exist.</evidence>
+  </decision>
+</decisions>

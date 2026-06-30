@@ -1,7 +1,6 @@
 // Runtime self-test (bun:test). Exercises the engine against an in-process fake harness (no
 // host CLI, no tokens), validating the fidelity-critical behaviors from
-// docs/decisions/001-workflow-dsl-fidelity-contract.md and the harness seam from
-// docs/decisions/003-harness-adoption.md.
+// DECISIONS.xml decision 001 and the harness seam from decision 003.
 import { expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";

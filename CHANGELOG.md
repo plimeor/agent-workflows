@@ -30,7 +30,7 @@ version boundaries.
   stays bounded regardless of agent count or run length. Pass `view: 'full'` to get the previous full
   payload (including the `progress.log` tail via `logTailBytes`) for drilling into one agent. The
   projection lives in the MCP layer only — `getRun` core and `status.json` are unchanged, so the CLI
-  `watch` / `ps` live progress tree is unaffected. See `docs/decisions/005`.
+  `watch` / `ps` live progress tree is unaffected. See `DECISIONS.xml` decision 005.
 - Updated the installed Agent Workflows skill so the parent session derives its one-line status from
   the compact per-phase counts, reaches for `view: 'full'` only to inspect a stalled or errored agent,
   and polls with a 60-second-minimum `waitMs` (raised from 30s) to further cut accumulated poll cost.
@@ -42,7 +42,7 @@ version boundaries.
   unsupported required field becomes null rather than a fabricated value), so a reply that genuinely
   dropped a required field stays invalid rather than being recovered by re-running. The DSL contract
   is unchanged: `agent(prompt, { schema })` still returns the validated object or `null`. See
-  `docs/decisions/006`.
+  `DECISIONS.xml` decision 006.
 - Tightened the authoring guidance: documented that `phase()` is a single global cursor so staged
   `agent()` calls must pass `opts.phase` explicitly under `parallel()`/`pipeline()`, that `workflow()`
   throws on an unknown name / unreadable `scriptPath` / child syntax error (wrap in `try/catch` to

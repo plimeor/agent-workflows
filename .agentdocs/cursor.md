@@ -1,0 +1,9 @@
+- Goal: Keep Agent Workflows documentation aligned with the current host-agnostic single-package runtime and the agent-docs document system.
+- Scope: Repository collaboration docs, including `.agentdocs/`, `DECISIONS.xml`, `AGENTS.md`, and README routing pointers.
+- Current docs:
+  - Requirements:
+  - Plan:
+  - Tasking:
+- Next step: Use `DECISIONS.xml` decisions 001, 002, 003, 005, 006, and 007 as the active authorities; start a new Requirement and Plan only when new durable capability work begins.
+- Blockers: none
+- Verification state: passed

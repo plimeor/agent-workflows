@@ -88,7 +88,7 @@ Every subagent is one text run through `@plimeor/harness`, and the "structured o
 
 - [`AGENTS.md`](AGENTS.md) — project layout and the contributor guide.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup and the lint/check/test commands.
-- [`docs/decisions/`](docs/decisions/) — the durable design decisions.
+- [`.agentdocs/cursor.md`](.agentdocs/cursor.md) and [`DECISIONS.xml`](DECISIONS.xml) — current collaboration state and durable design decisions.
 
 ## License
 

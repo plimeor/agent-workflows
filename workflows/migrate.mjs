@@ -30,7 +30,8 @@ export const meta = {
 //     glob?: string         // OPTIONAL. Restrict discovery to matching paths, e.g.
 //                           //   "src/**/*.ts". Defaults to the whole repo.
 //   }
-// Returns: { applied: [{file, notes}], failed: [{file, applied, verified, notes}] }
+// Returns: { applied: [{file, notes}], failed: [{file, applied, verified, notes}], summary }
+//   summary — the human-readable rollup written by the Summarize agent (null if it failed)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const a = args && typeof args === "object" ? args : {};
@@ -183,7 +184,7 @@ log(`${applied.length} applied+verified, ${failed.length} need attention.`);
 // rollup that calls out kept worktrees worth resolving by hand.
 phase("Summarize");
 
-await agent(
+const summary = await agent(
 	`You are writing the final report for a code migration that ran one transform agent per file,
 each in its own git worktree. A worktree whose verification failed or that still has
 uncommitted/conflicting changes was KEPT on disk for a human to resolve; clean ones were
@@ -212,4 +213,5 @@ and no markdown fences.`,
 return {
   applied: applied.map((r) => ({ file: r.file, notes: r.notes })),
   failed: failed.map((r) => ({ file: r.file, applied: r.applied, verified: r.verified, notes: r.notes })),
+  summary: typeof summary === "string" && summary.trim() ? summary : null,
 }

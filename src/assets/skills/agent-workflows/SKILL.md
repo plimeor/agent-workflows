@@ -258,5 +258,4 @@ you drop** (top-N, no-retry, sampling) — silent truncation reads as "covered e
   checkout — write capability still depends on the host being configured to allow edits.
 
 See `agent-workflows-authoring` for the full DSL reference and copy-ready skeletons, and
-`docs/decisions/001-workflow-dsl-fidelity-contract.md` for the exact mapping to the original
-Workflow mechanism.
+`DECISIONS.xml` decision 001 for the exact mapping to the original Workflow mechanism.

@@ -3,6 +3,8 @@
 // Flow:
 //   1. One read-only agent discovers the major subsystems/directories of the codebase
 //      and returns a structured list (the work-list).
+//   1b. A completeness critic independently re-scans the repo and names any MAJOR
+//      subsystems discovery missed; they are merged into the work-list before deep-read.
 //   2. A read-only deep-read agent per subsystem reads its key files and returns a
 //      structured profile: { name, purpose, keyFiles, entryPoints, dependencies, risks }.
 //   3. One synthesis agent assembles all profiles into a coherent narrative map plus a
@@ -34,7 +36,8 @@ export const meta = {
 	phases: [
 		{
 			title: "Discover",
-			detail: "one read-only agent enumerates the major subsystems/dirs",
+			detail:
+				"enumerate the major subsystems/dirs, then a completeness critic catches any missed",
 		},
 		{ title: "Read", detail: "one read-only deep-read agent per subsystem" },
 		{
@@ -342,6 +345,64 @@ if (givenPaths && givenPaths.length) {
 	log(
 		`Discovered ${subsystemList.length} subsystem(s): ${subsystemList.map((s) => s.name).join(", ")}`,
 	);
+
+	// Completeness critic — an independent read-only pass whose only job is to name
+	// MAJOR subsystems discovery missed. Merging here means a coverage gap costs one
+	// cheap agent now instead of an absent box in the final map. Skipped once we are
+	// already at MAX_SUBSYSTEMS (no room to deep-read more anyway).
+	if (subsystemList.length < MAX_SUBSYSTEMS) {
+		const known = subsystemList
+			.map((s) => `- ${s.name} (${s.path})`)
+			.join("\n");
+		const critique = await agent(
+			[
+				`You are auditing a codebase map for COMPLETENESS. Another agent already identified the`,
+				`subsystems listed below for the codebase rooted at "${root}". Your ONLY job is to find`,
+				`MAJOR subsystems it MISSED — real top-level units a newcomer must understand that are`,
+				`not already covered.`,
+				"",
+				"ALREADY IDENTIFIED:",
+				known,
+				"",
+				"How to work:",
+				`- Inspect the directory tree under "${root}" yourself; do not assume the list is complete.`,
+				"- Report ONLY subsystems that are genuinely missing AND genuinely major. Do not restate,",
+				"  rename, or split entries already listed; if a candidate overlaps an existing one, skip it.",
+				"- Apply the same exclusions: ignore node_modules, .git, dist/build output, vendored deps,",
+				"  lockfiles, generated code, and test fixtures.",
+				'- If the list is already complete, return an empty "subsystems" array.',
+				"",
+				'Return ONLY the JSON object matching the schema: a "subsystems" array, each { name, path, why }.',
+				"Paths must be relative to the repo root and must actually exist.",
+			].join("\n"),
+			{ label: "completeness-critic", phase: "Discover", schema: DISCOVERY },
+		);
+
+		const missed =
+			critique && Array.isArray(critique.subsystems)
+				? critique.subsystems
+				: [];
+		const seenPaths = new Set(subsystemList.map((s) => s.path));
+		const fresh = missed.filter(
+			(s) =>
+				s &&
+				typeof s.path === "string" &&
+				s.path.trim() &&
+				!seenPaths.has(s.path),
+		);
+		if (fresh.length) {
+			const added = fresh.slice(0, MAX_SUBSYSTEMS - subsystemList.length);
+			subsystemList = subsystemList.concat(added);
+			const names = added.map((s) => s.name).join(", ");
+			const note =
+				fresh.length > added.length
+					? ` (${fresh.length - added.length} dropped to respect MAX_SUBSYSTEMS=${MAX_SUBSYSTEMS})`
+					: "";
+			log(`Completeness critic added ${added.length} missed subsystem(s): ${names}${note}`);
+		} else {
+			log("Completeness critic found no missed subsystems.");
+		}
+	}
 }
 
 // ── 2. Deep-read each subsystem (read-only, in parallel) ─────────────────────

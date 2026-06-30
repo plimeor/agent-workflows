@@ -1,7 +1,7 @@
 // Host selection + extension resources. The CLI is the only layer that names a concrete
 // harness: it opens one from @plimeor/harness (default `codex`) and injects it into the
 // core engine, and it describes the agent-workflows extension (MCP server + skills + hooks)
-// for `install`/`uninstall`. Core never sees any of this. See docs/decisions/003-harness-adoption.md.
+// for `install`/`uninstall`. Core never sees any of this. See DECISIONS.xml decision 003.
 import os from "node:os";
 import path from "node:path";
 import type { HarnessExtension, HarnessHandle } from "@plimeor/harness";

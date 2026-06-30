@@ -1,7 +1,7 @@
 // Subagent substrate. One agent() call == one harness `process.run` (a text run). This is
 // the only place the engine touches the host: it hands the harness a prompt + cwd and reads
 // back { ok, text }. The harness (@plimeor/harness) owns every host detail — which CLI runs,
-// its flags, sandboxing — so core stays host-agnostic. See docs/decisions/003-harness-adoption.md.
+// its flags, sandboxing — so core stays host-agnostic. See DECISIONS.xml decision 003.
 import type {
 	HarnessHandle,
 	HarnessRun,

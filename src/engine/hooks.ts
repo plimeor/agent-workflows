@@ -1,6 +1,6 @@
 // The workflow DSL: agent / parallel / pipeline / phase / log / workflow, plus args and
 // budget. These are injected as globals into the workflow script. Semantics are a 1:1
-// reproduction of Claude Code's Workflow tool — see docs/decisions/001-workflow-dsl-fidelity-contract.md.
+// reproduction of Claude Code's Workflow tool — see DECISIONS.xml decision 001.
 import {
 	buildAgentPrompt,
 	buildRepairPrompt,
