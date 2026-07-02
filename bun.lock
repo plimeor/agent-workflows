@@ -7,7 +7,7 @@
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.29.0",
         "@plimeor/command-kit": "^0.1.5",
-        "@plimeor/harness": "^0.1.5",
+        "@plimeor/harness": "^0.1.6",
         "@valibot/to-json-schema": "^1.7.1",
         "valibot": "^1.4.2",
         "zod": "^3.25.76",
@@ -44,7 +44,7 @@
 
     "@plimeor/command-kit": ["@plimeor/command-kit@0.1.5", "", { "dependencies": { "@standard-schema/spec": "^1.1.0", "@types/json-schema": "^7.0.15" } }, "sha512-6jsdKT5rbrx9t9ycit3m0qqOZrq+VUlBgRqKkec5um8WRgOP+oMTPvWiNheNrRUpybtFvH3SPrkNOA4bHXVBYg=="],
 
-    "@plimeor/harness": ["@plimeor/harness@0.1.5", "", { "dependencies": { "@standard-schema/spec": "^1.1.0" } }, "sha512-g2ckCMM3GetPD4FiD0iJtJ2ql3RQoYuJ0B5l2twIfihfnmFKGZwWGNmnN0DXNTXF03bcReWUCs+FAGkb0CXbIg=="],
+    "@plimeor/harness": ["@plimeor/harness@0.1.6", "", { "dependencies": { "@standard-schema/spec": "^1.1.0" } }, "sha512-oLTwB5xv1aYxAvpgzskB79TVEJFd7XTe3EFVOhb4UHVnW6ukA0josJNzFcMbDVmxQWizSN4xgwHCRK+BMe1aOg=="],
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
