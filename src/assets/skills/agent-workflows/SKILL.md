@@ -83,9 +83,10 @@ agent-workflows MCP tools:
    body without running; fix any error before launching.
 2. **Launch** with `agent_workflows_start_run`, passing the script text as the inline `source`
    plus a `name`. It lints again (fail-closed), starts a detached run, and returns a `runId`
-   immediately. (`source` is the literal script; no path, no temp file.) **Then tell the user it
-   started** — surface the `runId` and that they can run `agent-workflows watch <runId> --follow`
-   for a live progress tree in a terminal.
+   immediately. (`source` is the literal script; no path, no temp file.) The default subagent
+   harness is the host this MCP server was installed into; pass `harness` only to override it.
+   **Then tell the user it started** — surface the `runId` and that they can run
+   `agent-workflows watch <runId> --follow` for a live progress tree in a terminal.
 3. **Observe sparsely — relay progress, don't narrate every poll.** A detached run has no GUI here, so
    the user sees only what you report. Poll `agent_workflows_get_run` as a **long-poll**: pass a
    `waitMs` near **180s**; the call blocks and returns the instant the run goes terminal (with the

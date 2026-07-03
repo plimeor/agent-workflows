@@ -7,7 +7,11 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { mkdir, realpath, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { __testGetRunWithWait, __testStartRunTool } from "../src/cli/mcp";
+import {
+	__testGetRunWithWait,
+	__testSetMcpDefaultHarness,
+	__testStartRunTool,
+} from "../src/cli/mcp";
 import { prepareRun } from "../src/cli/run-control";
 import { getRun, resolveRunCwd } from "../src/engine";
 
@@ -42,6 +46,7 @@ beforeEach(async () => {
 afterEach(() => {
 	if (priorRoots === undefined) delete process.env[ENV_KEY];
 	else process.env[ENV_KEY] = priorRoots;
+	__testSetMcpDefaultHarness();
 });
 
 const VALID_SOURCE =
@@ -267,4 +272,16 @@ test("T009: valid inline source still spawns and returns a runId", async () => {
 	const scriptPath = path.join(runsRoot(root), payload.runId, "script.mjs");
 	expect(existsSync(scriptPath)).toBe(true);
 	expect(readFileSync(scriptPath, "utf8")).toBe(VALID_SOURCE);
+});
+
+test("T009: start_run uses the MCP server default harness when omitted", async () => {
+	__testSetMcpDefaultHarness("cursor");
+	const result = await (__testStartRunTool as any).handler(
+		{ source: VALID_SOURCE, cwd: root },
+		{},
+	);
+	const payload = payloadOf(result);
+	const launchPath = path.join(runsRoot(root), payload.runId, "launch.json");
+	const launch = JSON.parse(readFileSync(launchPath, "utf8"));
+	expect(launch.harness).toBe("cursor");
 });

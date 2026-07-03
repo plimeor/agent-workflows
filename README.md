@@ -2,11 +2,12 @@
 
 **Turn one CLI coding agent into a team of them — fan out, cross-check, and synthesize, deterministically.**
 
-Agent Workflows ports Claude Code's `Workflow` mechanism onto any CLI coding agent (Codex by default, via [`@plimeor/harness`](https://www.npmjs.com/package/@plimeor/harness)). After a one-time install, your agent can — mid-conversation — break a big task into many subagents that run in parallel, verify each other, and roll up into one answer.
+Agent Workflows ports Claude Code's `Workflow` mechanism onto CLI coding agents including Codex,
+Cursor, Claude, Kiro, and Pi (via [`@plimeor/harness`](https://www.npmjs.com/package/@plimeor/harness)). After a one-time install, your agent can — mid-conversation — break a big task into many subagents that run in parallel, verify each other, and roll up into one answer.
 
 ## Quick start
 
-**1. Prerequisites** — [Bun](https://bun.sh), and a supported host CLI on your `PATH` (Codex by default; `claude` / `kiro` / `pi` also work).
+**1. Prerequisites** — [Bun](https://bun.sh), and a supported host CLI on your `PATH` (Codex by default; `claude` / `cursor` / `kiro` / `pi` also work).
 
 **2. Install the command:**
 
@@ -21,9 +22,11 @@ agent-workflows doctor          # verify Bun + your host are reachable
 
 ```bash
 agent-workflows install         # writes the skills + MCP server + hooks into your host (codex)
+# or: agent-workflows install cursor
 ```
 
-Start a fresh host session afterward so they load. (`agent-workflows uninstall` removes them.)
+Start a fresh host session afterward so they load. The MCP server installed into a non-default host
+uses that host as the default subagent harness. (`agent-workflows uninstall` removes them.)
 
 **4. Use it — the main way is to manually invoke the skill in a normal session.** Put the skill trigger directly in your prompt for work that is worth decomposing:
 
@@ -41,6 +44,23 @@ agent-workflows run review-changes        # run one by name
 agent-workflows run ./my-workflow.mjs     # or a script file
 agent-workflows watch <runId> --follow    # follow progress; `resume <runId>` replays unchanged work for free
 ```
+
+---
+
+## Supported hosts
+
+Agent Workflows supports the host harnesses exposed by `@plimeor/harness`: `codex`, `cursor`,
+`claude`, `kiro`, and `pi`. Codex remains the CLI default, but you can install into Cursor directly:
+
+```bash
+agent-workflows install cursor
+agent-workflows doctor --harness cursor
+agent-workflows run review-changes --harness cursor
+```
+
+When installed into Cursor, the registered MCP server starts as `agent-workflows mcp --harness cursor`,
+so workflow runs launched from Cursor default to Cursor subagents unless the MCP call explicitly
+overrides `harness`.
 
 ---
 
@@ -82,7 +102,7 @@ For the full reference — schemas, resume, worktree isolation, and copy-ready r
 
 ## Host-agnostic by design
 
-Every subagent is one text run through `@plimeor/harness`, and the "structured output" contract (the JSON Schema is embedded in the prompt and validated/retried in-engine) is layered on top — so it works on any text-producing host. The CLI is the only layer that picks a concrete harness (`--harness`, default `codex`).
+Every subagent is one text run through `@plimeor/harness`, and the "structured output" contract (the JSON Schema is embedded in the prompt and validated/retried in-engine) is layered on top — so it works on any text-producing host. The CLI picks a concrete harness with `--harness` (default `codex`); MCP runs default to the host used at install time.
 
 ## More
 

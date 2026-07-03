@@ -33,6 +33,12 @@ test("extensionSpec: MCP server launches the published binary, not a source path
 	expect(json).not.toContain(".ts");
 });
 
+test("extensionSpec: non-default harness becomes the MCP server default", () => {
+	const server = extensionSpec("cursor").resources.mcpServers?.[EXTENSION_ID];
+	expect(server?.command).toBe("agent-workflows");
+	expect(server?.args).toEqual(["mcp", "--harness", "cursor"]);
+});
+
 test("extensionSpec: every bundled skill path exists on disk", () => {
 	for (const skill of extensionSpec().resources.skills ?? []) {
 		expect(existsSync(skill)).toBe(true);

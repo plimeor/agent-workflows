@@ -14,7 +14,7 @@ export const EXTENSION_ID = "agent-workflows";
 
 // The portable launch command a host registers for the MCP server. `agent-workflows` is on
 // PATH after install, so the host invokes the published binary, never a source path.
-const MCP_LAUNCH = { command: "agent-workflows", args: ["mcp"] } as const;
+const MCP_LAUNCH = { command: "agent-workflows" } as const;
 
 // Bundled install assets (host skills + hook scripts) live under src/assets/ and ship with the
 // package, so the path resolves identically in-repo and from an installed tarball.
@@ -52,7 +52,13 @@ export async function openHarness(
 }
 
 // The agent-workflows extension: one MCP server, two skills, and the advisory session hooks.
-export function extensionSpec(): HarnessExtension {
+function mcpLaunchArgs(harnessId: string): string[] {
+	const args = ["mcp"];
+	if (harnessId !== DEFAULT_HARNESS) args.push("--harness", harnessId);
+	return args;
+}
+
+export function extensionSpec(harnessId = DEFAULT_HARNESS): HarnessExtension {
 	const skillsRoot = path.join(ASSETS_ROOT, "skills");
 	const hooksRoot = path.join(ASSETS_ROOT, "hooks");
 	const hookCommand = (file: string) =>
@@ -63,7 +69,7 @@ export function extensionSpec(): HarnessExtension {
 			mcpServers: {
 				[EXTENSION_ID]: {
 					command: MCP_LAUNCH.command,
-					args: [...MCP_LAUNCH.args],
+					args: mcpLaunchArgs(harnessId),
 				},
 			},
 			skills: [

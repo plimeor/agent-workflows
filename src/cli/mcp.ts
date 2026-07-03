@@ -16,6 +16,7 @@ import {
 	normalizeCwd,
 	resolveRunCwd,
 } from "../engine";
+import { DEFAULT_HARNESS } from "./harness";
 import {
 	prepareResumeRun,
 	prepareRun,
@@ -24,6 +25,11 @@ import {
 } from "./run-control";
 
 const server = new McpServer({ name: "agent-workflows", version: "0.1.1" });
+let mcpDefaultHarness = DEFAULT_HARNESS;
+
+export function __testSetMcpDefaultHarness(harnessId?: string | null) {
+	mcpDefaultHarness = harnessId || DEFAULT_HARNESS;
+}
 
 // Exposed for characterization tests so they can drive the real start_run handler
 // (including its fail-closed lint gate) without a live MCP transport.
@@ -59,7 +65,7 @@ export const __testStartRunTool = server.registerTool(
 			budget: input.budget ?? null,
 			concurrency: input.concurrency || null,
 			detached: true,
-			harness: input.harness || undefined,
+			harness: input.harness || mcpDefaultHarness,
 		});
 		const proc = await startDetachedRun(prepared);
 		return jsonResult({
@@ -258,7 +264,10 @@ server.registerResource(
 	async (uri, variables) => readRunResource(uri, variables),
 );
 
-export async function startMcpServer() {
+export async function startMcpServer(
+	opts: { defaultHarness?: string | null } = {},
+) {
+	__testSetMcpDefaultHarness(opts.defaultHarness);
 	const transport = new StdioServerTransport();
 	await server.connect(transport);
 }

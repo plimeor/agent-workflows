@@ -602,8 +602,20 @@ const cli = defineCli({
 		}),
 		defineCommand("mcp", {
 			description: "Start the stdio MCP server for host integration",
-			run: async () => {
-				await startMcpServer();
+			options: v.object({
+				harness: v.optional(
+					v.pipe(
+						v.string(),
+						v.description(
+							`default harness for workflow subagents launched through this MCP server (default: ${DEFAULT_HARNESS})`,
+						),
+					),
+				),
+			}),
+			run: async (ctx) => {
+				await startMcpServer({
+					defaultHarness: (ctx.options as any).harness || DEFAULT_HARNESS,
+				});
 				return undefined;
 			},
 		}),
@@ -624,11 +636,14 @@ const cli = defineCli({
 			description:
 				"Install agent-workflows (MCP server + skills + hooks) into a harness",
 			run: async (ctx) => {
+				const harnessId = ctx.args.host || DEFAULT_HARNESS;
 				const handle = await openHarness(
-					ctx.args.host || DEFAULT_HARNESS,
+					harnessId,
 					(ctx.options as any).cwd || process.cwd(),
 				);
-				const result = await handle.extensions.install(extensionSpec());
+				const result = await handle.extensions.install(
+					extensionSpec(handle.detection.id),
+				);
 				if (!result.success) {
 					throw new Error(
 						`install into ${handle.detection.id} failed:\n${result.issues
